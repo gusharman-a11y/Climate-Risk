@@ -19,6 +19,10 @@ from modules.scoring import (
 )
 from modules.disclosure import generate_pillar_disclosures, generate_all_disclosures
 from modules.pdf_export import generate_pdf
+from modules.carbon_registry import (
+    load_project_register, load_safeguard_data, load_contract_register,
+    summarise_developers, summarise_retirements, DOWNLOAD_INSTRUCTIONS,
+)
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -78,6 +82,7 @@ PAGES = [
     "Gap Assessment",
     "Disclosure Drafts",
     "Export",
+    "Carbon Market Registry",
 ]
 
 # ── Session state init ─────────────────────────────────────────────────────────
@@ -616,6 +621,473 @@ def page_export() -> None:
     )
 
 
+# ── Carbon Market Registry page ────────────────────────────────────────────────
+
+def _source_badge(source: str) -> str:
+    colours = {
+        "live": ("#D1FAE5", "#065F46", "Live from CER"),
+        "cache": ("#DBEAFE", "#1E40AF", "Cached"),
+        "upload": ("#EDE9FE", "#5B21B6", "Uploaded"),
+        "sample": ("#FEF3C7", "#92400E", "Demo data"),
+    }
+    bg, fg, label = colours.get(source, ("#F3F4F6", "#374151", source))
+    return (
+        f'<span style="background:{bg};color:{fg};padding:2px 10px;'
+        f'border-radius:12px;font-size:0.78rem;font-weight:600">{label}</span>'
+    )
+
+
+def _fmt_number(n: int | float) -> str:
+    if n >= 1_000_000:
+        return f"{n/1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n/1_000:.0f}k"
+    return str(int(n))
+
+
+def page_carbon_registry() -> None:
+    st.title("🌿 Carbon Market Registry")
+    st.markdown(
+        "Explore ACCU scheme projects, project developers, and credit "
+        "retirements using data from the **Clean Energy Regulator (CER)**."
+    )
+
+    # ── Data source controls ──────────────────────────────────────────────────
+    with st.expander("⬇️  Data Sources & Upload", expanded=False):
+        st.markdown(
+            "The CER publishes project and compliance data publicly. "
+            "Click **Refresh from CER** to attempt a live download, or upload "
+            "files you have already downloaded from cer.gov.au."
+        )
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            st.markdown("**ACCU Project Register**")
+            info = DOWNLOAD_INSTRUCTIONS["Project Register"]
+            st.markdown(f"[Open CER page]({info['url']})")
+            for step in info["steps"]:
+                st.caption(f"• {step}")
+            proj_upload = st.file_uploader(
+                "Upload project register (CSV / XLSX)",
+                type=["csv", "xlsx"],
+                key="proj_upload",
+            )
+        with col_b:
+            st.markdown("**Safeguard Compliance Data**")
+            info2 = DOWNLOAD_INSTRUCTIONS["Safeguard Data"]
+            st.markdown(f"[Open CER page]({info2['url']})")
+            for step in info2["steps"]:
+                st.caption(f"• {step}")
+            sg_upload = st.file_uploader(
+                "Upload safeguard data (CSV / XLSX)",
+                type=["csv", "xlsx"],
+                key="sg_upload",
+            )
+        with col_c:
+            st.markdown("**Contract Register**")
+            info3 = DOWNLOAD_INSTRUCTIONS["Contract Register"]
+            st.markdown(f"[Open CER page]({info3['url']})")
+            for step in info3["steps"]:
+                st.caption(f"• {step}")
+            contract_upload = st.file_uploader(
+                "Upload contract register (CSV / XLSX)",
+                type=["csv", "xlsx"],
+                key="contract_upload",
+            )
+
+        force_dl = st.button("🔄 Refresh from CER", type="secondary")
+
+    # ── Load data ─────────────────────────────────────────────────────────────
+    with st.spinner("Loading registry data…"):
+        proj_df, proj_src = load_project_register(proj_upload, force_download=force_dl)
+        sg_df, sg_src = load_safeguard_data(sg_upload, force_download=force_dl)
+        contract_df, contract_src = load_contract_register(contract_upload, force_download=force_dl)
+
+    # ── Source indicators ─────────────────────────────────────────────────────
+    src_cols = st.columns(3)
+    with src_cols[0]:
+        st.markdown(
+            f"Project Register {_source_badge(proj_src)}",
+            unsafe_allow_html=True,
+        )
+    with src_cols[1]:
+        st.markdown(
+            f"Safeguard Data {_source_badge(sg_src)}",
+            unsafe_allow_html=True,
+        )
+    with src_cols[2]:
+        st.markdown(
+            f"Contract Register {_source_badge(contract_src)}",
+            unsafe_allow_html=True,
+        )
+
+    if any(s == "sample" for s in (proj_src, sg_src, contract_src)):
+        st.info(
+            "**Demo mode** – showing sample data. Upload CER files or click "
+            "**Refresh from CER** above to use live data.",
+            icon="ℹ️",
+        )
+
+    st.markdown("---")
+
+    # ── Tabs ──────────────────────────────────────────────────────────────────
+    tab_overview, tab_projects, tab_devs, tab_retirements = st.tabs([
+        "📊 Overview",
+        "📋 Project Register",
+        "🏗️ Project Developers",
+        "♻️ Credit Retirements",
+    ])
+
+    # ── Overview tab ──────────────────────────────────────────────────────────
+    with tab_overview:
+        active = proj_df[proj_df.get("Project Status", proj_df.columns[0]).name == "Project Status"]
+        try:
+            n_active = int((proj_df["Project Status"] == "Active").sum())
+        except Exception:
+            n_active = len(proj_df)
+        n_total = len(proj_df)
+        total_accus = int(proj_df["ACCUs Issued"].sum()) if "ACCUs Issued" in proj_df.columns else 0
+        n_devs = proj_df["Project Proponent"].nunique() if "Project Proponent" in proj_df.columns else 0
+        total_surrendered = int(sg_df["Total Credits Surrendered"].sum()) if "Total Credits Surrendered" in sg_df.columns else 0
+        n_facilities = len(sg_df)
+
+        m1, m2, m3, m4, m5, m6 = st.columns(6)
+        m1.metric("Total Projects", f"{n_total:,}")
+        m2.metric("Active Projects", f"{n_active:,}")
+        m3.metric("ACCUs Issued", _fmt_number(total_accus))
+        m4.metric("Project Developers", f"{n_devs:,}")
+        m5.metric("Safeguard Facilities", f"{n_facilities:,}")
+        m6.metric("Credits Surrendered", _fmt_number(total_surrendered))
+
+        st.markdown("---")
+        col_left, col_right = st.columns(2)
+
+        # Projects by method type
+        with col_left:
+            st.markdown("#### Projects by Method Type")
+            if "Method Type" in proj_df.columns:
+                method_counts = proj_df["Method Type"].value_counts().reset_index()
+                method_counts.columns = ["Method Type", "Projects"]
+                fig_mt = go.Figure(go.Bar(
+                    x=method_counts["Projects"],
+                    y=method_counts["Method Type"],
+                    orientation="h",
+                    marker_color=["#10B981", "#3B82F6"],
+                    text=method_counts["Projects"],
+                    textposition="outside",
+                ))
+                fig_mt.update_layout(
+                    margin=dict(l=10, r=30, t=10, b=10),
+                    height=220,
+                    xaxis_title="Number of Projects",
+                    yaxis_title="",
+                    plot_bgcolor="white",
+                )
+                st.plotly_chart(fig_mt, use_container_width=True)
+
+        # Projects by state
+        with col_right:
+            st.markdown("#### Projects by State")
+            if "Project location (State)" in proj_df.columns:
+                state_counts = proj_df["Project location (State)"].value_counts().reset_index()
+                state_counts.columns = ["State", "Projects"]
+                fig_st = go.Figure(go.Bar(
+                    x=state_counts["State"],
+                    y=state_counts["Projects"],
+                    marker_color="#6366F1",
+                    text=state_counts["Projects"],
+                    textposition="outside",
+                ))
+                fig_st.update_layout(
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    height=220,
+                    yaxis_title="Projects",
+                    plot_bgcolor="white",
+                )
+                st.plotly_chart(fig_st, use_container_width=True)
+
+        st.markdown("#### Top 10 Methods by ACCUs Issued")
+        if "Method" in proj_df.columns and "ACCUs Issued" in proj_df.columns:
+            method_accus = (
+                proj_df.groupby("Method")["ACCUs Issued"]
+                .sum()
+                .sort_values(ascending=False)
+                .head(10)
+                .reset_index()
+            )
+            fig_ma = go.Figure(go.Bar(
+                x=method_accus["ACCUs Issued"],
+                y=method_accus["Method"],
+                orientation="h",
+                marker_color="#0EA5E9",
+                text=[_fmt_number(v) for v in method_accus["ACCUs Issued"]],
+                textposition="outside",
+            ))
+            fig_ma.update_layout(
+                margin=dict(l=10, r=60, t=10, b=10),
+                height=350,
+                xaxis_title="ACCUs Issued",
+                yaxis_title="",
+                plot_bgcolor="white",
+            )
+            st.plotly_chart(fig_ma, use_container_width=True)
+
+    # ── Project Register tab ──────────────────────────────────────────────────
+    with tab_projects:
+        st.markdown("#### ACCU Scheme Project Register")
+        st.caption(
+            "Full list of all registered ACCU scheme projects. "
+            "Use the filters to narrow results."
+        )
+
+        fc1, fc2, fc3 = st.columns(3)
+        with fc1:
+            all_states = sorted(proj_df["Project location (State)"].dropna().unique().tolist()) \
+                if "Project location (State)" in proj_df.columns else []
+            sel_states = st.multiselect("State/Territory", all_states, key="proj_state_filter")
+        with fc2:
+            all_methods = sorted(proj_df["Method"].dropna().unique().tolist()) \
+                if "Method" in proj_df.columns else []
+            sel_methods = st.multiselect("Method", all_methods, key="proj_method_filter")
+        with fc3:
+            status_opts = ["All", "Active", "Revoked"]
+            sel_status = st.selectbox("Status", status_opts, key="proj_status_filter")
+
+        filtered = proj_df.copy()
+        if sel_states:
+            filtered = filtered[filtered["Project location (State)"].isin(sel_states)]
+        if sel_methods:
+            filtered = filtered[filtered["Method"].isin(sel_methods)]
+        if sel_status != "All":
+            filtered = filtered[filtered["Project Status"] == sel_status]
+
+        st.caption(f"Showing {len(filtered):,} of {len(proj_df):,} projects")
+
+        display_cols = [c for c in [
+            "Project ID", "Project Name", "Project Proponent", "Method",
+            "Method Type", "Project location (State)", "Project Status",
+            "ACCUs Issued", "Date Project Registered",
+        ] if c in filtered.columns]
+        st.dataframe(filtered[display_cols], use_container_width=True, height=450)
+
+        st.download_button(
+            "⬇️ Download filtered data (CSV)",
+            data=filtered[display_cols].to_csv(index=False),
+            file_name="accu_project_register.csv",
+            mime="text/csv",
+        )
+
+    # ── Project Developers tab ────────────────────────────────────────────────
+    with tab_devs:
+        st.markdown("#### Project Developer Profiles")
+        st.caption(
+            "Aggregated view of each organisation operating as a project "
+            "proponent (developer) in the ACCU Scheme."
+        )
+
+        dev_df = summarise_developers(proj_df)
+
+        # Top developers chart
+        top_n = min(15, len(dev_df))
+        top_devs = dev_df.head(top_n)
+        fig_devs = go.Figure()
+        fig_devs.add_trace(go.Bar(
+            y=top_devs["Developer"],
+            x=top_devs["ACCUs Issued"],
+            name="ACCUs Issued",
+            orientation="h",
+            marker_color="#10B981",
+            text=[_fmt_number(v) for v in top_devs["ACCUs Issued"]],
+            textposition="outside",
+        ))
+        fig_devs.update_layout(
+            title=f"Top {top_n} Developers by ACCUs Issued",
+            margin=dict(l=10, r=80, t=40, b=10),
+            height=max(300, top_n * 30),
+            xaxis_title="ACCUs Issued",
+            yaxis=dict(autorange="reversed"),
+            plot_bgcolor="white",
+        )
+        st.plotly_chart(fig_devs, use_container_width=True)
+
+        # Developer search
+        dev_search = st.text_input("Search developer", placeholder="Type to filter…", key="dev_search")
+        dev_view = dev_df.copy()
+        if dev_search:
+            dev_view = dev_view[
+                dev_view["Developer"].str.contains(dev_search, case=False, na=False)
+            ]
+
+        st.dataframe(dev_view, use_container_width=True, height=380)
+
+        # Developer drill-down
+        st.markdown("---")
+        st.markdown("#### Developer Drill-down")
+        chosen_dev = st.selectbox(
+            "Select a developer",
+            options=["— select —"] + dev_df["Developer"].tolist(),
+            key="dev_drilldown",
+        )
+        if chosen_dev != "— select —":
+            dev_projects = proj_df[proj_df["Project Proponent"] == chosen_dev]
+            d_cols = [c for c in [
+                "Project ID", "Project Name", "Method", "Method Type",
+                "Project location (State)", "Project Status",
+                "ACCUs Issued", "Date Project Registered",
+            ] if c in dev_projects.columns]
+
+            d1, d2, d3 = st.columns(3)
+            d1.metric("Total Projects", len(dev_projects))
+            d2.metric("Active Projects", int((dev_projects.get("Project Status", pd.Series()) == "Active").sum()))
+            d3.metric("ACCUs Issued", _fmt_number(int(dev_projects["ACCUs Issued"].sum())))
+
+            st.dataframe(dev_projects[d_cols], use_container_width=True, height=300)
+
+            # Check for matching contracts
+            if "Project Proponent" in contract_df.columns:
+                dev_contracts = contract_df[contract_df["Project Proponent"] == chosen_dev]
+                if not dev_contracts.empty:
+                    st.markdown("**Government contracts (ERF auction)**")
+                    st.dataframe(dev_contracts, use_container_width=True)
+
+        st.download_button(
+            "⬇️ Download developer summary (CSV)",
+            data=dev_df.to_csv(index=False),
+            file_name="accu_developer_summary.csv",
+            mime="text/csv",
+        )
+
+    # ── Credit Retirements tab ────────────────────────────────────────────────
+    with tab_retirements:
+        st.markdown("#### Credit Retirements – Safeguard Mechanism Compliance")
+        st.caption(
+            "Safeguard Mechanism covered facilities and their ACCU / SMC "
+            "surrenders to meet compliance obligations."
+        )
+
+        # KPIs
+        r1, r2, r3, r4 = st.columns(4)
+        r1.metric("Facilities", f"{len(sg_df):,}")
+        r2.metric(
+            "Total Covered Emissions",
+            _fmt_number(int(sg_df["Covered Emissions (tCO2e)"].sum())) + " tCO2e"
+            if "Covered Emissions (tCO2e)" in sg_df.columns else "—",
+        )
+        r3.metric(
+            "ACCUs Surrendered",
+            _fmt_number(int(sg_df["ACCUs Surrendered"].sum()))
+            if "ACCUs Surrendered" in sg_df.columns else "—",
+        )
+        r4.metric(
+            "SMCs Surrendered",
+            _fmt_number(int(sg_df["SMCs Surrendered"].sum()))
+            if "SMCs Surrendered" in sg_df.columns else "—",
+        )
+
+        st.markdown("---")
+        col_l, col_r = st.columns(2)
+
+        # Surrenders by sector
+        with col_l:
+            st.markdown("#### Credits Surrendered by Sector")
+            if "Industry Sector" in sg_df.columns and "Total Credits Surrendered" in sg_df.columns:
+                sec_data = (
+                    sg_df.groupby("Industry Sector")["Total Credits Surrendered"]
+                    .sum()
+                    .sort_values(ascending=False)
+                    .reset_index()
+                )
+                fig_sec = go.Figure(go.Bar(
+                    y=sec_data["Industry Sector"],
+                    x=sec_data["Total Credits Surrendered"],
+                    orientation="h",
+                    marker_color="#F59E0B",
+                    text=[_fmt_number(v) for v in sec_data["Total Credits Surrendered"]],
+                    textposition="outside",
+                ))
+                fig_sec.update_layout(
+                    margin=dict(l=10, r=60, t=10, b=10),
+                    height=350,
+                    xaxis_title="Credits Surrendered",
+                    yaxis=dict(autorange="reversed"),
+                    plot_bgcolor="white",
+                )
+                st.plotly_chart(fig_sec, use_container_width=True)
+
+        # ACCU vs SMC breakdown
+        with col_r:
+            st.markdown("#### ACCU vs SMC Split by Sector")
+            if all(c in sg_df.columns for c in ["Industry Sector", "ACCUs Surrendered", "SMCs Surrendered"]):
+                sec_split = sg_df.groupby("Industry Sector")[
+                    ["ACCUs Surrendered", "SMCs Surrendered"]
+                ].sum().sort_values("ACCUs Surrendered", ascending=False).head(8).reset_index()
+
+                fig_split = go.Figure()
+                fig_split.add_trace(go.Bar(
+                    name="ACCUs",
+                    y=sec_split["Industry Sector"],
+                    x=sec_split["ACCUs Surrendered"],
+                    orientation="h",
+                    marker_color="#3B82F6",
+                ))
+                fig_split.add_trace(go.Bar(
+                    name="SMCs",
+                    y=sec_split["Industry Sector"],
+                    x=sec_split["SMCs Surrendered"],
+                    orientation="h",
+                    marker_color="#8B5CF6",
+                ))
+                fig_split.update_layout(
+                    barmode="stack",
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    height=350,
+                    xaxis_title="Credits",
+                    yaxis=dict(autorange="reversed"),
+                    plot_bgcolor="white",
+                    legend=dict(orientation="h", y=1.05),
+                )
+                st.plotly_chart(fig_split, use_container_width=True)
+
+        # Sector summary table
+        st.markdown("#### Sector Summary")
+        sector_summary = summarise_retirements(sg_df)
+        st.dataframe(sector_summary, use_container_width=True)
+
+        # Facility-level table
+        st.markdown("---")
+        st.markdown("#### Facility-Level Data")
+        rf1, rf2 = st.columns(2)
+        with rf1:
+            all_sectors = sorted(sg_df["Industry Sector"].dropna().unique().tolist()) \
+                if "Industry Sector" in sg_df.columns else []
+            sel_sectors = st.multiselect("Filter by sector", all_sectors, key="sg_sector_filter")
+        with rf2:
+            all_sg_states = sorted(sg_df["State/Territory"].dropna().unique().tolist()) \
+                if "State/Territory" in sg_df.columns else []
+            sel_sg_states = st.multiselect("Filter by state", all_sg_states, key="sg_state_filter")
+
+        sg_filtered = sg_df.copy()
+        if sel_sectors:
+            sg_filtered = sg_filtered[sg_filtered["Industry Sector"].isin(sel_sectors)]
+        if sel_sg_states:
+            sg_filtered = sg_filtered[sg_filtered["State/Territory"].isin(sel_sg_states)]
+
+        sg_display_cols = [c for c in [
+            "Facility Name", "State/Territory", "Industry Sector",
+            "Covered Emissions (tCO2e)", "Baseline Emissions (tCO2e)",
+            "Net Position (tCO2e)", "ACCUs Surrendered", "SMCs Surrendered",
+            "Total Credits Surrendered", "Compliance Status",
+        ] if c in sg_filtered.columns]
+
+        st.dataframe(sg_filtered[sg_display_cols], use_container_width=True, height=420)
+
+        st.download_button(
+            "⬇️ Download safeguard data (CSV)",
+            data=sg_filtered[sg_display_cols].to_csv(index=False),
+            file_name="safeguard_compliance.csv",
+            mime="text/csv",
+        )
+
+
 # ── Router ─────────────────────────────────────────────────────────────────────
 page = st.session_state.page
 
@@ -629,3 +1101,5 @@ elif page == "Disclosure Drafts":
     page_disclosure_drafts()
 elif page == "Export":
     page_export()
+elif page == "Carbon Market Registry":
+    page_carbon_registry()
