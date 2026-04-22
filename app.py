@@ -19,10 +19,11 @@ from modules.scoring import (
 )
 from modules.disclosure import generate_pillar_disclosures, generate_all_disclosures
 from modules.pdf_export import generate_pdf
+from modules.carbon_dashboard import render_carbon_dashboard
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="AASB S2 Climate Disclosure Tool",
+    page_title="Climate Risk & Carbon Market Tool",
     page_icon="🌍",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -78,6 +79,7 @@ PAGES = [
     "Gap Assessment",
     "Disclosure Drafts",
     "Export",
+    "Carbon Market",
 ]
 
 # ── Session state init ─────────────────────────────────────────────────────────
@@ -199,6 +201,11 @@ with st.sidebar:
     st.markdown("---")
     st.caption("AASB S2 Climate-Related Financial Disclosures  \n"
                "Mandatory for large entities from 2025")
+    st.markdown("---")
+    st.markdown("**Tools**")
+    if st.button("🌿 Carbon Market", use_container_width=True,
+                 type="primary" if st.session_state.page == "Carbon Market" else "secondary"):
+        st.session_state.page = "Carbon Market"
 
 
 # ── Guard: require a client ────────────────────────────────────────────────────
@@ -619,7 +626,9 @@ def page_export() -> None:
 # ── Router ─────────────────────────────────────────────────────────────────────
 page = st.session_state.page
 
-if page == "Overview":
+if page == "Carbon Market":
+    render_carbon_dashboard()
+elif page == "Overview":
     page_overview()
 elif page in ("Governance", "Strategy", "Risk Management", "Metrics & Targets"):
     page_pillar_form(page)

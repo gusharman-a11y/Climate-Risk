@@ -1,0 +1,440 @@
+"""
+Carbon market sample data: projects and issuances.
+All figures are illustrative (tCO2e).
+"""
+
+import pandas as pd
+
+PROJECTS = [
+    {
+        "id": "VCS-1360",
+        "name": "Amazon Sustainable Landscapes",
+        "type": "REDD+",
+        "country": "Brazil",
+        "standard": "Verra VCS",
+        "status": "Active",
+        "vintage_start": 2013,
+        "vintage_end": 2032,
+        "area_ha": 1_400_000,
+        "description": "Protecting 1.4 M ha of Amazon rainforest from agricultural conversion in Pará state.",
+    },
+    {
+        "id": "VCS-0612",
+        "name": "Cardamom Mountains REDD+",
+        "type": "REDD+",
+        "country": "Cambodia",
+        "standard": "Verra VCS",
+        "status": "Active",
+        "vintage_start": 2017,
+        "vintage_end": 2036,
+        "area_ha": 443_000,
+        "description": "Avoided deforestation across Cambodia's Cardamom Mountains biodiversity corridor.",
+    },
+    {
+        "id": "GS-4834",
+        "name": "Brikama Clean Cookstoves",
+        "type": "Clean Cooking",
+        "country": "Kenya",
+        "standard": "Gold Standard",
+        "status": "Active",
+        "vintage_start": 2018,
+        "vintage_end": 2028,
+        "area_ha": None,
+        "description": "Distributing efficient biomass cookstoves to 120 000 households across rural Kenya.",
+    },
+    {
+        "id": "VCS-0271",
+        "name": "Sumatra Forest Conservation",
+        "type": "REDD+",
+        "country": "Indonesia",
+        "standard": "Verra VCS",
+        "status": "Active",
+        "vintage_start": 2016,
+        "vintage_end": 2035,
+        "area_ha": 238_000,
+        "description": "Reducing deforestation in lowland Sumatra peat-swamp and dryland forests.",
+    },
+    {
+        "id": "ACR-0023",
+        "name": "Otter Creek Improved Forest Management",
+        "type": "IFM",
+        "country": "USA",
+        "standard": "ACR",
+        "status": "Active",
+        "vintage_start": 2019,
+        "vintage_end": 2039,
+        "area_ha": 18_500,
+        "description": "Extended timber rotation and harvest deferral on 18 500 ha of US Pacific Northwest forest.",
+    },
+    {
+        "id": "GS-1278",
+        "name": "Rwanda Wind Energy Project",
+        "type": "Renewable Energy",
+        "country": "Rwanda",
+        "standard": "Gold Standard",
+        "status": "Retired",
+        "vintage_start": 2016,
+        "vintage_end": 2021,
+        "area_ha": None,
+        "description": "30 MW wind farm displacing diesel generation on the Rwandan national grid.",
+    },
+    {
+        "id": "VCS-0634",
+        "name": "Madre de Dios Amazon Conservation",
+        "type": "REDD+",
+        "country": "Peru",
+        "standard": "Verra VCS",
+        "status": "Active",
+        "vintage_start": 2016,
+        "vintage_end": 2035,
+        "area_ha": 594_000,
+        "description": "Protecting intact Amazon forests in Peru's Madre de Dios region from land-use conversion.",
+    },
+    {
+        "id": "CAR-0234",
+        "name": "California Grassland Carbon",
+        "type": "Soil Carbon",
+        "country": "USA",
+        "standard": "CAR",
+        "status": "Active",
+        "vintage_start": 2020,
+        "vintage_end": 2040,
+        "area_ha": 45_000,
+        "description": "Soil organic carbon sequestration through managed grazing on California rangelands.",
+    },
+    {
+        "id": "VCS-1511",
+        "name": "Congo Basin REDD+",
+        "type": "REDD+",
+        "country": "DRC",
+        "standard": "Verra VCS",
+        "status": "Active",
+        "vintage_start": 2018,
+        "vintage_end": 2037,
+        "area_ha": 2_200_000,
+        "description": "Landscape-scale forest protection across 2.2 M ha of Congo Basin old-growth forest.",
+    },
+    {
+        "id": "GS-3421",
+        "name": "Solar Water Pumps India",
+        "type": "Renewable Energy",
+        "country": "India",
+        "standard": "Gold Standard",
+        "status": "Active",
+        "vintage_start": 2019,
+        "vintage_end": 2029,
+        "area_ha": None,
+        "description": "Replacing diesel irrigation pumps with solar-powered units across Rajasthan and Maharashtra.",
+    },
+    {
+        "id": "ACCU-0011",
+        "name": "Northern Australia Savanna Burning",
+        "type": "Fire Management",
+        "country": "Australia",
+        "standard": "ACCU",
+        "status": "Active",
+        "vintage_start": 2017,
+        "vintage_end": 2037,
+        "area_ha": 820_000,
+        "description": "Indigenous-led early dry season burning to reduce late season wildfires in Arnhem Land.",
+    },
+    {
+        "id": "VCS-0052",
+        "name": "Nova Vida Reforestation",
+        "type": "ARR",
+        "country": "Brazil",
+        "standard": "Verra VCS",
+        "status": "Retired",
+        "vintage_start": 2015,
+        "vintage_end": 2022,
+        "area_ha": 22_000,
+        "description": "Afforestation and reforestation on degraded pastureland in Mato Grosso do Sul.",
+    },
+    {
+        "id": "VCS-0673",
+        "name": "Katingan Mentaya",
+        "type": "REDD+",
+        "country": "Indonesia",
+        "standard": "Verra VCS",
+        "status": "Active",
+        "vintage_start": 2016,
+        "vintage_end": 2035,
+        "area_ha": 157_000,
+        "description": "One of the world's largest peatland restoration and conservation projects in Central Kalimantan.",
+    },
+    {
+        "id": "GS-2103",
+        "name": "Bangladesh Clean Cooking Initiative",
+        "type": "Clean Cooking",
+        "country": "Bangladesh",
+        "standard": "Gold Standard",
+        "status": "Active",
+        "vintage_start": 2020,
+        "vintage_end": 2030,
+        "area_ha": None,
+        "description": "Distributing improved biomass stoves to 80 000 households in Bangladesh's delta region.",
+    },
+    {
+        "id": "CAR-0456",
+        "name": "Oregon Forest Carbon Project",
+        "type": "IFM",
+        "country": "USA",
+        "standard": "CAR",
+        "status": "Suspended",
+        "vintage_start": 2018,
+        "vintage_end": 2021,
+        "area_ha": 32_000,
+        "description": "Improved forest management on Oregon Coast Range timberlands; suspended after 2021 wildfire.",
+    },
+    {
+        "id": "VCS-0999",
+        "name": "Belize Blue Carbon Initiative",
+        "type": "Blue Carbon",
+        "country": "Belize",
+        "standard": "Verra VCS",
+        "status": "Under Validation",
+        "vintage_start": 2024,
+        "vintage_end": 2044,
+        "area_ha": 11_500,
+        "description": "Mangrove conservation and restoration across Belize's coastal wetlands.",
+    },
+    {
+        "id": "ACR-0567",
+        "name": "US Landfill Gas Recovery",
+        "type": "Methane Avoidance",
+        "country": "USA",
+        "standard": "ACR",
+        "status": "Active",
+        "vintage_start": 2017,
+        "vintage_end": 2032,
+        "area_ha": None,
+        "description": "Methane capture and flaring at 12 municipal solid waste landfills across Texas and Ohio.",
+    },
+    {
+        "id": "GS-5019",
+        "name": "Ethiopia Rural Solar Mini-Grids",
+        "type": "Renewable Energy",
+        "country": "Ethiopia",
+        "standard": "Gold Standard",
+        "status": "Active",
+        "vintage_start": 2021,
+        "vintage_end": 2031,
+        "area_ha": None,
+        "description": "Off-grid solar mini-grids serving 45 rural communities in Ethiopia's Oromia region.",
+    },
+    {
+        "id": "VCS-1243",
+        "name": "Andean Reforestation Colombia",
+        "type": "ARR",
+        "country": "Colombia",
+        "standard": "Verra VCS",
+        "status": "Active",
+        "vintage_start": 2019,
+        "vintage_end": 2039,
+        "area_ha": 28_000,
+        "description": "Native species reforestation on degraded Andean hillsides with smallholder communities.",
+    },
+    {
+        "id": "ACCU-0045",
+        "name": "Mallee Eucalyptus Plantings",
+        "type": "ARR",
+        "country": "Australia",
+        "standard": "ACCU",
+        "status": "Active",
+        "vintage_start": 2018,
+        "vintage_end": 2038,
+        "area_ha": 14_000,
+        "description": "Mallee eucalyptus belt planting on mixed farming land in Western Australia's wheatbelt.",
+    },
+]
+
+# tCO2e issuances per project per vintage year
+_RAW_ISSUANCES = [
+    # VCS-1360
+    ("VCS-1360", 2016, 820_000, 650_000),
+    ("VCS-1360", 2017, 910_000, 780_000),
+    ("VCS-1360", 2018, 1_050_000, 900_000),
+    ("VCS-1360", 2019, 1_180_000, 1_020_000),
+    ("VCS-1360", 2020, 1_240_000, 1_100_000),
+    ("VCS-1360", 2021, 1_310_000, 1_050_000),
+    ("VCS-1360", 2022, 1_290_000, 940_000),
+    ("VCS-1360", 2023, 1_350_000, 870_000),
+    ("VCS-1360", 2024, 1_420_000, 620_000),
+    # VCS-0612
+    ("VCS-0612", 2017, 320_000, 260_000),
+    ("VCS-0612", 2018, 350_000, 300_000),
+    ("VCS-0612", 2019, 380_000, 330_000),
+    ("VCS-0612", 2020, 410_000, 360_000),
+    ("VCS-0612", 2021, 430_000, 350_000),
+    ("VCS-0612", 2022, 460_000, 320_000),
+    ("VCS-0612", 2023, 490_000, 290_000),
+    ("VCS-0612", 2024, 510_000, 210_000),
+    # GS-4834
+    ("GS-4834", 2018, 88_000, 72_000),
+    ("GS-4834", 2019, 102_000, 88_000),
+    ("GS-4834", 2020, 115_000, 98_000),
+    ("GS-4834", 2021, 128_000, 108_000),
+    ("GS-4834", 2022, 138_000, 112_000),
+    ("GS-4834", 2023, 145_000, 105_000),
+    ("GS-4834", 2024, 150_000, 88_000),
+    # VCS-0271
+    ("VCS-0271", 2016, 590_000, 480_000),
+    ("VCS-0271", 2017, 640_000, 530_000),
+    ("VCS-0271", 2018, 710_000, 610_000),
+    ("VCS-0271", 2019, 760_000, 670_000),
+    ("VCS-0271", 2020, 800_000, 700_000),
+    ("VCS-0271", 2021, 850_000, 680_000),
+    ("VCS-0271", 2022, 890_000, 620_000),
+    ("VCS-0271", 2023, 920_000, 580_000),
+    ("VCS-0271", 2024, 960_000, 430_000),
+    # ACR-0023
+    ("ACR-0023", 2019, 52_000, 40_000),
+    ("ACR-0023", 2020, 68_000, 55_000),
+    ("ACR-0023", 2021, 74_000, 62_000),
+    ("ACR-0023", 2022, 82_000, 65_000),
+    ("ACR-0023", 2023, 91_000, 60_000),
+    ("ACR-0023", 2024, 98_000, 42_000),
+    # GS-1278
+    ("GS-1278", 2016, 48_000, 44_000),
+    ("GS-1278", 2017, 52_000, 50_000),
+    ("GS-1278", 2018, 55_000, 53_000),
+    ("GS-1278", 2019, 58_000, 56_000),
+    ("GS-1278", 2020, 60_000, 58_000),
+    ("GS-1278", 2021, 62_000, 62_000),
+    # VCS-0634
+    ("VCS-0634", 2016, 510_000, 420_000),
+    ("VCS-0634", 2017, 560_000, 470_000),
+    ("VCS-0634", 2018, 610_000, 530_000),
+    ("VCS-0634", 2019, 660_000, 580_000),
+    ("VCS-0634", 2020, 700_000, 610_000),
+    ("VCS-0634", 2021, 740_000, 590_000),
+    ("VCS-0634", 2022, 770_000, 540_000),
+    ("VCS-0634", 2023, 800_000, 500_000),
+    ("VCS-0634", 2024, 830_000, 380_000),
+    # CAR-0234
+    ("CAR-0234", 2020, 105_000, 80_000),
+    ("CAR-0234", 2021, 120_000, 98_000),
+    ("CAR-0234", 2022, 135_000, 108_000),
+    ("CAR-0234", 2023, 148_000, 102_000),
+    ("CAR-0234", 2024, 162_000, 85_000),
+    # VCS-1511
+    ("VCS-1511", 2018, 720_000, 580_000),
+    ("VCS-1511", 2019, 820_000, 690_000),
+    ("VCS-1511", 2020, 940_000, 800_000),
+    ("VCS-1511", 2021, 1_060_000, 860_000),
+    ("VCS-1511", 2022, 1_150_000, 820_000),
+    ("VCS-1511", 2023, 1_230_000, 780_000),
+    ("VCS-1511", 2024, 1_310_000, 580_000),
+    # GS-3421
+    ("GS-3421", 2019, 62_000, 50_000),
+    ("GS-3421", 2020, 74_000, 62_000),
+    ("GS-3421", 2021, 85_000, 72_000),
+    ("GS-3421", 2022, 94_000, 78_000),
+    ("GS-3421", 2023, 102_000, 74_000),
+    ("GS-3421", 2024, 108_000, 58_000),
+    # ACCU-0011
+    ("ACCU-0011", 2017, 210_000, 170_000),
+    ("ACCU-0011", 2018, 240_000, 200_000),
+    ("ACCU-0011", 2019, 265_000, 225_000),
+    ("ACCU-0011", 2020, 290_000, 250_000),
+    ("ACCU-0011", 2021, 310_000, 260_000),
+    ("ACCU-0011", 2022, 330_000, 248_000),
+    ("ACCU-0011", 2023, 345_000, 230_000),
+    ("ACCU-0011", 2024, 355_000, 195_000),
+    # VCS-0052
+    ("VCS-0052", 2015, 140_000, 110_000),
+    ("VCS-0052", 2016, 165_000, 138_000),
+    ("VCS-0052", 2017, 188_000, 158_000),
+    ("VCS-0052", 2018, 210_000, 182_000),
+    ("VCS-0052", 2019, 228_000, 200_000),
+    ("VCS-0052", 2020, 242_000, 218_000),
+    ("VCS-0052", 2021, 255_000, 232_000),
+    ("VCS-0052", 2022, 268_000, 268_000),
+    # VCS-0673
+    ("VCS-0673", 2016, 900_000, 740_000),
+    ("VCS-0673", 2017, 1_020_000, 860_000),
+    ("VCS-0673", 2018, 1_140_000, 980_000),
+    ("VCS-0673", 2019, 1_260_000, 1_090_000),
+    ("VCS-0673", 2020, 1_380_000, 1_200_000),
+    ("VCS-0673", 2021, 1_500_000, 1_150_000),
+    ("VCS-0673", 2022, 1_580_000, 1_080_000),
+    ("VCS-0673", 2023, 1_640_000, 980_000),
+    ("VCS-0673", 2024, 1_720_000, 780_000),
+    # GS-2103
+    ("GS-2103", 2020, 72_000, 58_000),
+    ("GS-2103", 2021, 84_000, 70_000),
+    ("GS-2103", 2022, 96_000, 80_000),
+    ("GS-2103", 2023, 108_000, 78_000),
+    ("GS-2103", 2024, 118_000, 62_000),
+    # CAR-0456
+    ("CAR-0456", 2018, 82_000, 68_000),
+    ("CAR-0456", 2019, 96_000, 82_000),
+    ("CAR-0456", 2020, 108_000, 96_000),
+    ("CAR-0456", 2021, 118_000, 100_000),
+    # VCS-0999 – no issuances yet (Under Validation)
+    # ACR-0567
+    ("ACR-0567", 2017, 122_000, 100_000),
+    ("ACR-0567", 2018, 138_000, 118_000),
+    ("ACR-0567", 2019, 152_000, 134_000),
+    ("ACR-0567", 2020, 168_000, 148_000),
+    ("ACR-0567", 2021, 182_000, 156_000),
+    ("ACR-0567", 2022, 196_000, 162_000),
+    ("ACR-0567", 2023, 210_000, 158_000),
+    ("ACR-0567", 2024, 224_000, 134_000),
+    # GS-5019
+    ("GS-5019", 2021, 52_000, 42_000),
+    ("GS-5019", 2022, 64_000, 52_000),
+    ("GS-5019", 2023, 74_000, 58_000),
+    ("GS-5019", 2024, 82_000, 48_000),
+    # VCS-1243
+    ("VCS-1243", 2019, 98_000, 78_000),
+    ("VCS-1243", 2020, 118_000, 96_000),
+    ("VCS-1243", 2021, 138_000, 112_000),
+    ("VCS-1243", 2022, 155_000, 122_000),
+    ("VCS-1243", 2023, 172_000, 118_000),
+    ("VCS-1243", 2024, 188_000, 96_000),
+    # ACCU-0045
+    ("ACCU-0045", 2018, 82_000, 65_000),
+    ("ACCU-0045", 2019, 96_000, 78_000),
+    ("ACCU-0045", 2020, 108_000, 90_000),
+    ("ACCU-0045", 2021, 120_000, 100_000),
+    ("ACCU-0045", 2022, 132_000, 108_000),
+    ("ACCU-0045", 2023, 144_000, 106_000),
+    ("ACCU-0045", 2024, 154_000, 90_000),
+]
+
+# ── Public DataFrames ──────────────────────────────────────────────────────────
+
+def get_projects_df() -> pd.DataFrame:
+    df = pd.DataFrame(PROJECTS)
+    iso_df = get_issuances_df()
+    totals = (
+        iso_df.groupby("project_id")
+        .agg(total_issued=("credits_issued", "sum"), total_retired=("credits_retired", "sum"))
+        .reset_index()
+    )
+    df = df.merge(totals, left_on="id", right_on="project_id", how="left")
+    df["total_issued"] = df["total_issued"].fillna(0).astype(int)
+    df["total_retired"] = df["total_retired"].fillna(0).astype(int)
+    df["credits_outstanding"] = df["total_issued"] - df["total_retired"]
+    df.drop(columns=["project_id"], errors="ignore", inplace=True)
+    return df
+
+
+def get_issuances_df() -> pd.DataFrame:
+    df = pd.DataFrame(
+        _RAW_ISSUANCES,
+        columns=["project_id", "vintage_year", "credits_issued", "credits_retired"],
+    )
+    proj_lookup = {p["id"]: p for p in PROJECTS}
+    df["project_name"] = df["project_id"].map(lambda pid: proj_lookup.get(pid, {}).get("name", ""))
+    df["type"] = df["project_id"].map(lambda pid: proj_lookup.get(pid, {}).get("type", ""))
+    df["country"] = df["project_id"].map(lambda pid: proj_lookup.get(pid, {}).get("country", ""))
+    df["standard"] = df["project_id"].map(lambda pid: proj_lookup.get(pid, {}).get("standard", ""))
+    return df
+
+
+# ── Filter helpers ─────────────────────────────────────────────────────────────
+
+def unique_values(field: str) -> list:
+    return sorted({p[field] for p in PROJECTS if p[field]})
