@@ -1,0 +1,2621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carbon Market Dashboard</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Inter, -apple-system, Helvetica, sans-serif; background: #F8FAFC; color: #1E293B; }
+  header { background: #0F172A; color: #E2E8F0; padding: 1.25rem 2rem; display: flex; align-items: center; gap: 1rem; }
+  header h1 { font-size: 1.4rem; font-weight: 700; }
+  header span { font-size: 0.85rem; color: #94A3B8; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+  .kpi-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 1rem; margin-bottom: 2rem; }
+  .kpi { background: white; border-radius: 10px; padding: 1.25rem 1.5rem; border: 1px solid #E2E8F0;
+           box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .kpi label { font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: .05em; }
+  .kpi .value { font-size: 1.65rem; font-weight: 700; color: #0F172A; margin-top: .25rem; }
+  .tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #E2E8F0; padding-bottom: 0; }
+  .tab-btn { padding: .6rem 1.25rem; border: none; background: none; cursor: pointer;
+               font-size: .9rem; font-weight: 600; color: #64748B; border-bottom: 3px solid transparent;
+               margin-bottom: -2px; transition: all .15s; }
+  .tab-btn.active { color: #1D4ED8; border-bottom-color: #1D4ED8; }
+  .tab-btn:hover { color: #1D4ED8; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .card { background: white; border-radius: 10px; border: 1px solid #E2E8F0;
+            box-shadow: 0 1px 3px rgba(0,0,0,.06); padding: 1.25rem; margin-bottom: 1.5rem; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+  .section-title { font-size: 1rem; font-weight: 700; color: #0F172A; margin-bottom: 1rem; }
+  .search-bar { width: 100%; padding: .65rem 1rem; border: 1px solid #CBD5E1; border-radius: 8px;
+                  font-size: .9rem; margin-bottom: 1.25rem; outline: none; }
+  .search-bar:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+  .data-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  .data-table th { background: #F1F5F9; padding: .65rem .9rem; text-align: left; font-weight: 600;
+                     color: #475569; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em;
+                     border-bottom: 2px solid #E2E8F0; white-space: nowrap; }
+  .data-table td { padding: .6rem .9rem; border-bottom: 1px solid #F1F5F9; vertical-align: middle; }
+  .data-table tr:hover td { background: #F8FAFC; }
+  .data-table td small { color: #64748B; font-size: .78rem; }
+  .download-btn { display: inline-block; margin-top: 1rem; padding: .55rem 1.2rem; background: #1D4ED8;
+                    color: white; border-radius: 7px; font-size: .85rem; font-weight: 600;
+                    cursor: pointer; border: none; }
+  .download-btn:hover { background: #1e40af; }
+  @media(max-width:900px) { .kpi-row { grid-template-columns: repeat(2,1fr); } .grid-2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <span style="font-size:1.8rem">🌿</span>
+  <div>
+    <h1>Carbon Market Dashboard</h1>
+    <span>Voluntary &amp; compliance carbon projects · 20 projects · 131 issuance records</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi"><label>Total Projects</label><div class="value">20</div></div>
+    <div class="kpi"><label>Active Projects</label><div class="value">16</div></div>
+    <div class="kpi"><label>Credits Issued</label><div class="value">57.7 M<span style="font-size:1rem;color:#64748B"> tCO₂e</span></div></div>
+    <div class="kpi"><label>Credits Retired</label><div class="value">43.0 M<span style="font-size:1rem;color:#64748B"> tCO₂e</span></div></div>
+    <div class="kpi"><label>Outstanding</label><div class="value">14.8 M<span style="font-size:1rem;color:#64748B"> tCO₂e</span></div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('overview',this)">Overview</button>
+    <button class="tab-btn" onclick="showTab('projects',this)">Projects</button>
+    <button class="tab-btn" onclick="showTab('issuances',this)">Issuances</button>
+  </div>
+
+  <!-- Overview tab -->
+  <div id="tab-overview" class="tab-panel active">
+    <div class="card"><div>                            <div id="chart-trend" class="plotly-graph-div" style="height:380px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("chart-trend")) {                    Plotly.newPlot(                        "chart-trend",                        [{"hovertemplate":"Vintage %{x}\u003cbr\u003eIssued: %{y:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#3B82F6"},"name":"Issued","x":{"dtype":"i2","bdata":"3wfgB+EH4gfjB+QH5QfmB+cH6Ac="},"y":{"dtype":"i4","bdata":"4CICAKhHLgDwXj0AuIpTAEioXwDwx2oA0D10APB5dwDomHkAiAGAAA=="},"type":"bar"},{"hovertemplate":"Vintage %{x}\u003cbr\u003eRetired: %{y:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#10B981"},"name":"Retired","x":{"dtype":"i2","bdata":"3wfgB+EH4gfjB+QH5QfmB+cH6Ac="},"y":{"dtype":"i4","bdata":"sK0BAEC4JQBQizMAUBNHALiQUgAYwlwAEOddAHhTVwDopk0AkHo7AA=="},"type":"bar"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"title":{"text":"Vintage Year"},"tickmode":"linear","dtick":1},"yaxis":{"title":{"text":"tCO\u2082e"},"tickformat":",.0f","gridcolor":"#F1F5F9"},"legend":{"orientation":"h","y":1.08},"font":{"family":"Inter, Helvetica, sans-serif","size":13},"margin":{"l":60,"r":20,"t":60,"b":60},"title":{"text":"Annual Credit Issuances vs Retirements"},"barmode":"group","plot_bgcolor":"white","paper_bgcolor":"white","height":380},                        {"responsive": true}                    )                };            </script>        </div></div>
+    <div class="grid-2">
+      <div class="card"><div>                            <div id="chart-type" class="plotly-graph-div" style="height:360px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("chart-type")) {                    Plotly.newPlot(                        "chart-type",                        [{"hovertemplate":"%{y}\u003cbr\u003e%{x:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":["#92400E","#065F46","#7C3AED","#B45309","#475569","#C2410C","#15803D","#1D4ED8"]},"orientation":"h","text":["0.67 M","0.87 M","1.13 M","1.34 M","1.39 M","2.35 M","3.40 M","46.59 M"],"textposition":"outside","x":{"dtype":"i4","bdata":"MDkKAIhCDQDgRREAAIIUAIA9FQAoyCMAKOUzADDoxgI="},"y":["Soil Carbon","IFM","Renewable Energy","Clean Cooking","Methane Avoidance","Fire Management","ARR","REDD+"],"type":"bar"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"tickformat":",.0f","gridcolor":"#F1F5F9"},"font":{"family":"Inter, Helvetica, sans-serif","size":13},"margin":{"l":140,"r":80,"t":60,"b":40},"title":{"text":"Credits Issued by Project Type"},"plot_bgcolor":"white","paper_bgcolor":"white","height":360},                        {"responsive": true}                    )                };            </script>        </div></div>
+      <div class="card"><div>                            <div id="chart-std" class="plotly-graph-div" style="height:360px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("chart-std")) {                    Plotly.newPlot(                        "chart-std",                        [{"hole":0.45,"hovertemplate":"%{label}\u003cbr\u003e%{value:,.0f} tCO\u2082e (%{percent})\u003cextra\u003e\u003c\u002fextra\u003e","labels":["Verra VCS","ACCU","Gold Standard","ACR","CAR"],"marker":{"colors":["#1D4ED8","#0369A1","#D97706","#15803D","#7C3AED"]},"textfont":{"size":13},"textinfo":"label+percent","values":{"dtype":"i4","bdata":"uAvuAsiJMADgxyUA6FUcAFBjEAA="},"type":"pie"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"font":{"family":"Inter, Helvetica, sans-serif","size":13},"margin":{"l":20,"r":20,"t":60,"b":20},"title":{"text":"Credits Issued by Standard"},"height":360,"paper_bgcolor":"white","showlegend":false},                        {"responsive": true}                    )                };            </script>        </div></div>
+    </div>
+    <div class="card"><div>                            <div id="chart-country" class="plotly-graph-div" style="height:380px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("chart-country")) {                    Plotly.newPlot(                        "chart-country",                        [{"hovertemplate":"%{x}\u003cbr\u003e%{y:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#6366F1"},"text":["19.26 M","12.27 M","7.23 M","6.18 M","3.35 M","3.18 M","2.93 M","0.87 M","0.87 M","0.53 M","0.48 M","0.34 M","0.27 M"],"textposition":"outside","x":["Indonesia","Brazil","DRC","Peru","Cambodia","Australia","USA","Colombia","Kenya","India","Bangladesh","Rwanda","Ethiopia"],"y":{"dtype":"i4","bdata":"YOIlARAquwAwUm4AoExeAPAdMwDIiTAAOLksAIhCDQDQNg0AyAIIADBLBwCYHAUAgCYEAA=="},"type":"bar"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"yaxis":{"tickformat":",.0f","gridcolor":"#F1F5F9"},"font":{"family":"Inter, Helvetica, sans-serif","size":13},"margin":{"l":60,"r":20,"t":60,"b":60},"title":{"text":"Credits Issued by Country"},"plot_bgcolor":"white","paper_bgcolor":"white","height":380},                        {"responsive": true}                    )                };            </script>        </div></div>
+    <div class="card"><div>                            <div id="chart-retire" class="plotly-graph-div" style="height:360px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("chart-retire")) {                    Plotly.newPlot(                        "chart-retire",                        [{"hovertemplate":"%{x}\u003cbr\u003eRetirement rate: %{y:.1f}%\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":["#15803D","#7C3AED","#475569","#065F46","#C2410C","#B45309","#1D4ED8","#92400E"]},"text":["81.3%","81.0%","79.7%","77.1%","75.8%","75.8%","73.5%","70.6%"],"textposition":"outside","x":["ARR","Renewable Energy","Methane Avoidance","IFM","Fire Management","Clean Cooking","REDD+","Soil Carbon"],"y":{"dtype":"f8","bdata":"MzMzMzNTVEAAAAAAAEBUQM3MzMzM7FNAZmZmZmZGU0AzMzMzM\u002fNSQDMzMzMz81JAAAAAAABgUkBmZmZmZqZRQA=="},"type":"bar"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"yaxis":{"range":[0,115],"ticksuffix":"%","gridcolor":"#F1F5F9"},"font":{"family":"Inter, Helvetica, sans-serif","size":13},"margin":{"l":60,"r":20,"t":60,"b":60},"title":{"text":"Retirement Rate by Project Type"},"plot_bgcolor":"white","paper_bgcolor":"white","height":360},                        {"responsive": true}                    )                };            </script>        </div></div>
+  </div>
+
+  <!-- Projects tab -->
+  <div id="tab-projects" class="tab-panel">
+    <div class="card">
+      <input class="search-bar" id="proj-search" placeholder="Search by name, type, country, standard…" oninput="filterTable('projects-table','proj-search')">
+      
+    <table id="projects-table" class="data-table">
+      <thead>
+        <tr>
+          <th>Project</th><th>Type</th><th>Country</th><th>Standard</th>
+          <th>Status</th><th>Area</th><th>Vintages</th>
+          <th>Issued (M tCO₂e)</th><th>Retired (M tCO₂e)</th><th>Outstanding (M tCO₂e)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>VCS-1360</strong><br><small>Amazon Sustainable Landscapes</small></td>
+          <td>REDD+</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>1,400,000 ha</td>
+          <td style="text-align:right">2013–2032</td>
+          <td style="text-align:right">10.57 M</td>
+          <td style="text-align:right">7.93 M</td>
+          <td style="text-align:right">2.64 M</td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0612</strong><br><small>Cardamom Mountains REDD+</small></td>
+          <td>REDD+</td>
+          <td>Cambodia</td>
+          <td>Verra VCS</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>443,000 ha</td>
+          <td style="text-align:right">2017–2036</td>
+          <td style="text-align:right">3.35 M</td>
+          <td style="text-align:right">2.42 M</td>
+          <td style="text-align:right">0.93 M</td>
+        </tr>
+        <tr>
+          <td><strong>GS-4834</strong><br><small>Brikama Clean Cookstoves</small></td>
+          <td>Clean Cooking</td>
+          <td>Kenya</td>
+          <td>Gold Standard</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>N/A</td>
+          <td style="text-align:right">2018–2028</td>
+          <td style="text-align:right">0.87 M</td>
+          <td style="text-align:right">0.67 M</td>
+          <td style="text-align:right">0.20 M</td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0271</strong><br><small>Sumatra Forest Conservation</small></td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>238,000 ha</td>
+          <td style="text-align:right">2016–2035</td>
+          <td style="text-align:right">7.12 M</td>
+          <td style="text-align:right">5.30 M</td>
+          <td style="text-align:right">1.82 M</td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0023</strong><br><small>Otter Creek Improved Forest Management</small></td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>18,500 ha</td>
+          <td style="text-align:right">2019–2039</td>
+          <td style="text-align:right">0.47 M</td>
+          <td style="text-align:right">0.32 M</td>
+          <td style="text-align:right">0.14 M</td>
+        </tr>
+        <tr>
+          <td><strong>GS-1278</strong><br><small>Rwanda Wind Energy Project</small></td>
+          <td>Renewable Energy</td>
+          <td>Rwanda</td>
+          <td>Gold Standard</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#F1F5F9;color:#475569">Retired</span></td>
+          <td>N/A</td>
+          <td style="text-align:right">2016–2021</td>
+          <td style="text-align:right">0.34 M</td>
+          <td style="text-align:right">0.32 M</td>
+          <td style="text-align:right">0.01 M</td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0634</strong><br><small>Madre de Dios Amazon Conservation</small></td>
+          <td>REDD+</td>
+          <td>Peru</td>
+          <td>Verra VCS</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>594,000 ha</td>
+          <td style="text-align:right">2016–2035</td>
+          <td style="text-align:right">6.18 M</td>
+          <td style="text-align:right">4.62 M</td>
+          <td style="text-align:right">1.56 M</td>
+        </tr>
+        <tr>
+          <td><strong>CAR-0234</strong><br><small>California Grassland Carbon</small></td>
+          <td>Soil Carbon</td>
+          <td>USA</td>
+          <td>CAR</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>45,000 ha</td>
+          <td style="text-align:right">2020–2040</td>
+          <td style="text-align:right">0.67 M</td>
+          <td style="text-align:right">0.47 M</td>
+          <td style="text-align:right">0.20 M</td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1511</strong><br><small>Congo Basin REDD+</small></td>
+          <td>REDD+</td>
+          <td>DRC</td>
+          <td>Verra VCS</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>2,200,000 ha</td>
+          <td style="text-align:right">2018–2037</td>
+          <td style="text-align:right">7.23 M</td>
+          <td style="text-align:right">5.11 M</td>
+          <td style="text-align:right">2.12 M</td>
+        </tr>
+        <tr>
+          <td><strong>GS-3421</strong><br><small>Solar Water Pumps India</small></td>
+          <td>Renewable Energy</td>
+          <td>India</td>
+          <td>Gold Standard</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>N/A</td>
+          <td style="text-align:right">2019–2029</td>
+          <td style="text-align:right">0.53 M</td>
+          <td style="text-align:right">0.39 M</td>
+          <td style="text-align:right">0.13 M</td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0011</strong><br><small>Northern Australia Savanna Burning</small></td>
+          <td>Fire Management</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>820,000 ha</td>
+          <td style="text-align:right">2017–2037</td>
+          <td style="text-align:right">2.35 M</td>
+          <td style="text-align:right">1.78 M</td>
+          <td style="text-align:right">0.57 M</td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0052</strong><br><small>Nova Vida Reforestation</small></td>
+          <td>ARR</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#F1F5F9;color:#475569">Retired</span></td>
+          <td>22,000 ha</td>
+          <td style="text-align:right">2015–2022</td>
+          <td style="text-align:right">1.70 M</td>
+          <td style="text-align:right">1.51 M</td>
+          <td style="text-align:right">0.19 M</td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0673</strong><br><small>Katingan Mentaya</small></td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>157,000 ha</td>
+          <td style="text-align:right">2016–2035</td>
+          <td style="text-align:right">12.14 M</td>
+          <td style="text-align:right">8.86 M</td>
+          <td style="text-align:right">3.28 M</td>
+        </tr>
+        <tr>
+          <td><strong>GS-2103</strong><br><small>Bangladesh Clean Cooking Initiative</small></td>
+          <td>Clean Cooking</td>
+          <td>Bangladesh</td>
+          <td>Gold Standard</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>N/A</td>
+          <td style="text-align:right">2020–2030</td>
+          <td style="text-align:right">0.48 M</td>
+          <td style="text-align:right">0.35 M</td>
+          <td style="text-align:right">0.13 M</td>
+        </tr>
+        <tr>
+          <td><strong>CAR-0456</strong><br><small>Oregon Forest Carbon Project</small></td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>CAR</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#FEE2E2;color:#DC2626">Suspended</span></td>
+          <td>32,000 ha</td>
+          <td style="text-align:right">2018–2021</td>
+          <td style="text-align:right">0.40 M</td>
+          <td style="text-align:right">0.35 M</td>
+          <td style="text-align:right">0.06 M</td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0999</strong><br><small>Belize Blue Carbon Initiative</small></td>
+          <td>Blue Carbon</td>
+          <td>Belize</td>
+          <td>Verra VCS</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#FEF3C7;color:#D97706">Under Validation</span></td>
+          <td>11,500 ha</td>
+          <td style="text-align:right">2024–2044</td>
+          <td style="text-align:right">0.00 M</td>
+          <td style="text-align:right">0.00 M</td>
+          <td style="text-align:right">0.00 M</td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0567</strong><br><small>US Landfill Gas Recovery</small></td>
+          <td>Methane Avoidance</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>N/A</td>
+          <td style="text-align:right">2017–2032</td>
+          <td style="text-align:right">1.39 M</td>
+          <td style="text-align:right">1.11 M</td>
+          <td style="text-align:right">0.28 M</td>
+        </tr>
+        <tr>
+          <td><strong>GS-5019</strong><br><small>Ethiopia Rural Solar Mini-Grids</small></td>
+          <td>Renewable Energy</td>
+          <td>Ethiopia</td>
+          <td>Gold Standard</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>N/A</td>
+          <td style="text-align:right">2021–2031</td>
+          <td style="text-align:right">0.27 M</td>
+          <td style="text-align:right">0.20 M</td>
+          <td style="text-align:right">0.07 M</td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1243</strong><br><small>Andean Reforestation Colombia</small></td>
+          <td>ARR</td>
+          <td>Colombia</td>
+          <td>Verra VCS</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>28,000 ha</td>
+          <td style="text-align:right">2019–2039</td>
+          <td style="text-align:right">0.87 M</td>
+          <td style="text-align:right">0.62 M</td>
+          <td style="text-align:right">0.25 M</td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0045</strong><br><small>Mallee Eucalyptus Plantings</small></td>
+          <td>ARR</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:#DCFCE7;color:#15803D">Active</span></td>
+          <td>14,000 ha</td>
+          <td style="text-align:right">2018–2038</td>
+          <td style="text-align:right">0.84 M</td>
+          <td style="text-align:right">0.64 M</td>
+          <td style="text-align:right">0.20 M</td>
+        </tr></tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Issuances tab -->
+  <div id="tab-issuances" class="tab-panel">
+    <div class="card"><div>                            <div id="chart-area" class="plotly-graph-div" style="height:400px; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("chart-area")) {                    Plotly.newPlot(                        "chart-area",                        [{"hovertemplate":"REDD+\u003cbr\u003eVintage %{x}\u003cbr\u003e%{y:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#1D4ED8","width":2},"mode":"lines+markers","name":"REDD+","stackgroup":"one","x":{"dtype":"i2","bdata":"4AfhB+IH4wfkB+UH5gfnB+gH"},"y":{"dtype":"i4","bdata":"oAcrAJCkNACg4kUAoDVNADB3UwDQ31kAYLBdADAdYgAw\u002f2YA"},"type":"scatter"},{"hovertemplate":"ARR\u003cbr\u003eVintage %{x}\u003cbr\u003e%{y:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#15803D","width":2},"mode":"lines+markers","name":"ARR","stackgroup":"one","x":{"dtype":"i2","bdata":"3wfgB+EH4gfjB+QH5QfmB+cH6Ac="},"y":{"dtype":"i4","bdata":"4CICAIiEAgBg3gIAoHQEAHBwBgAgJAcA6NMHAPh3CABg0gQA8DcFAA=="},"type":"scatter"},{"hovertemplate":"Fire Management\u003cbr\u003eVintage %{x}\u003cbr\u003e%{y:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#C2410C","width":2},"mode":"lines+markers","name":"Fire Management","stackgroup":"one","x":{"dtype":"i2","bdata":"4QfiB+MH5AflB+YH5wfoBw=="},"y":{"dtype":"i4","bdata":"UDQDAICpAwAoCwQA0GwEAPC6BAAQCQUAqEMFALhqBQA="},"type":"scatter"},{"hovertemplate":"Methane Avoidance\u003cbr\u003eVintage %{x}\u003cbr\u003e%{y:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#475569","width":2},"mode":"lines+markers","name":"Methane Avoidance","stackgroup":"one","x":{"dtype":"i2","bdata":"4QfiB+MH5AflB+YH5wfoBw=="},"y":{"dtype":"i4","bdata":"kNwBABAbAgDAUQIAQJACAPDGAgCg\u002fQIAUDQDAABrAwA="},"type":"scatter"},{"hovertemplate":"Clean Cooking\u003cbr\u003eVintage %{x}\u003cbr\u003e%{y:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#B45309","width":2},"mode":"lines+markers","name":"Clean Cooking","stackgroup":"one","x":{"dtype":"i2","bdata":"4gfjB+QH5QfmB+cH6Ac="},"y":{"dtype":"i4","bdata":"wFcBAHCOAQB42gIAIDwDABCSAwBI3AMA4BYEAA=="},"type":"scatter"},{"hovertemplate":"Renewable Energy\u003cbr\u003eVintage %{x}\u003cbr\u003e%{y:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#7C3AED","width":2},"mode":"lines+markers","name":"Renewable Energy","stackgroup":"one","x":{"dtype":"i2","bdata":"4AfhB+IH4wfkB+UH5gfnB+gH"},"y":{"dtype":"i4","bdata":"gLsAACDLAADY1gAAwNQBAHALAgBYCQMAMGkCAICvAgAw5gIA"},"type":"scatter"},{"hovertemplate":"IFM\u003cbr\u003eVintage %{x}\u003cbr\u003e%{y:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#065F46","width":2},"mode":"lines+markers","name":"IFM","stackgroup":"one","x":{"dtype":"i2","bdata":"4gfjB+QH5QfmB+cH6Ac="},"y":{"dtype":"i4","bdata":"UEABACBCAgCArwIAAO4CAFBAAQB4YwEA0H4BAA=="},"type":"scatter"},{"hovertemplate":"Soil Carbon\u003cbr\u003eVintage %{x}\u003cbr\u003e%{y:,.0f} tCO\u2082e\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#92400E","width":2},"mode":"lines+markers","name":"Soil Carbon","stackgroup":"one","x":{"dtype":"i2","bdata":"5AflB+YH5wfoBw=="},"y":{"dtype":"i4","bdata":"KJoBAMDUAQBYDwIAIEICANB4AgA="},"type":"scatter"}],                        {"template":{"data":{"histogram2dcontour":[{"type":"histogram2dcontour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"choropleth":[{"type":"choropleth","colorbar":{"outlinewidth":0,"ticks":""}}],"histogram2d":[{"type":"histogram2d","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"heatmap":[{"type":"heatmap","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"contourcarpet":[{"type":"contourcarpet","colorbar":{"outlinewidth":0,"ticks":""}}],"contour":[{"type":"contour","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"surface":[{"type":"surface","colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]}],"mesh3d":[{"type":"mesh3d","colorbar":{"outlinewidth":0,"ticks":""}}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"parcoords":[{"type":"parcoords","line":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolargl":[{"type":"scatterpolargl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"scattergeo":[{"type":"scattergeo","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterpolar":[{"type":"scatterpolar","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"scattergl":[{"type":"scattergl","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatter3d":[{"type":"scatter3d","line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermap":[{"type":"scattermap","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattermapbox":[{"type":"scattermapbox","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scatterternary":[{"type":"scatterternary","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"scattercarpet":[{"type":"scattercarpet","marker":{"colorbar":{"outlinewidth":0,"ticks":""}}}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"white","linecolor":"white","minorgridcolor":"white","startlinecolor":"#2a3f5f"},"type":"carpet"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}],"barpolar":[{"marker":{"line":{"color":"#E5ECF6","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"pie":[{"automargin":true,"type":"pie"}]},"layout":{"autotypenumbers":"strict","colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"hovermode":"closest","hoverlabel":{"align":"left"},"paper_bgcolor":"white","plot_bgcolor":"#E5ECF6","polar":{"bgcolor":"#E5ECF6","angularaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"radialaxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"ternary":{"bgcolor":"#E5ECF6","aaxis":{"gridcolor":"white","linecolor":"white","ticks":""},"baxis":{"gridcolor":"white","linecolor":"white","ticks":""},"caxis":{"gridcolor":"white","linecolor":"white","ticks":""}},"coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]]},"xaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"yaxis":{"gridcolor":"white","linecolor":"white","ticks":"","title":{"standoff":15},"zerolinecolor":"white","automargin":true,"zerolinewidth":2},"scene":{"xaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"yaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2},"zaxis":{"backgroundcolor":"#E5ECF6","gridcolor":"white","linecolor":"white","showbackground":true,"ticks":"","zerolinecolor":"white","gridwidth":2}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"geo":{"bgcolor":"white","landcolor":"#E5ECF6","subunitcolor":"white","showland":true,"showlakes":true,"lakecolor":"white"},"title":{"x":0.05},"mapbox":{"style":"light"}}},"xaxis":{"title":{"text":"Vintage Year"},"tickmode":"linear","dtick":1},"yaxis":{"title":{"text":"tCO\u2082e"},"tickformat":",.0f","gridcolor":"#F1F5F9"},"legend":{"orientation":"h","y":-0.22},"font":{"family":"Inter, Helvetica, sans-serif","size":13},"margin":{"l":60,"r":20,"t":60,"b":100},"title":{"text":"Cumulative Issuances by Type Over Time"},"plot_bgcolor":"white","paper_bgcolor":"white","height":400},                        {"responsive": true}                    )                };            </script>        </div></div>
+    <div class="card">
+      <input class="search-bar" id="iss-search" placeholder="Search by project, type, country…" oninput="filterTable('issuances-table','iss-search')">
+      
+    <table id="issuances-table" class="data-table">
+      <thead>
+        <tr>
+          <th>Project</th><th>Vintage</th><th>Type</th><th>Country</th>
+          <th>Standard</th><th>Issued (tCO₂e)</th><th>Retired (tCO₂e)</th><th>Retirement %</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>VCS-0673</strong><br><small>Katingan Mentaya</small></td>
+          <td>2024</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,720,000</td>
+          <td style="text-align:right">780,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:45%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">45.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1360</strong><br><small>Amazon Sustainable Landscapes</small></td>
+          <td>2024</td>
+          <td>REDD+</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,420,000</td>
+          <td style="text-align:right">620,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:43%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">43.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1511</strong><br><small>Congo Basin REDD+</small></td>
+          <td>2024</td>
+          <td>REDD+</td>
+          <td>DRC</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,310,000</td>
+          <td style="text-align:right">580,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:44%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">44.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0271</strong><br><small>Sumatra Forest Conservation</small></td>
+          <td>2024</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">960,000</td>
+          <td style="text-align:right">430,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:44%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">44.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0634</strong><br><small>Madre de Dios Amazon Conservation</small></td>
+          <td>2024</td>
+          <td>REDD+</td>
+          <td>Peru</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">830,000</td>
+          <td style="text-align:right">380,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:45%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">45.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0612</strong><br><small>Cardamom Mountains REDD+</small></td>
+          <td>2024</td>
+          <td>REDD+</td>
+          <td>Cambodia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">510,000</td>
+          <td style="text-align:right">210,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:41%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">41.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0011</strong><br><small>Northern Australia Savanna Burning</small></td>
+          <td>2024</td>
+          <td>Fire Management</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">355,000</td>
+          <td style="text-align:right">195,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:54%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">54.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0567</strong><br><small>US Landfill Gas Recovery</small></td>
+          <td>2024</td>
+          <td>Methane Avoidance</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">224,000</td>
+          <td style="text-align:right">134,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:59%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">59.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1243</strong><br><small>Andean Reforestation Colombia</small></td>
+          <td>2024</td>
+          <td>ARR</td>
+          <td>Colombia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">188,000</td>
+          <td style="text-align:right">96,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:51%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">51.1%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>CAR-0234</strong><br><small>California Grassland Carbon</small></td>
+          <td>2024</td>
+          <td>Soil Carbon</td>
+          <td>USA</td>
+          <td>CAR</td>
+          <td style="text-align:right">162,000</td>
+          <td style="text-align:right">85,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:52%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">52.5%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0045</strong><br><small>Mallee Eucalyptus Plantings</small></td>
+          <td>2024</td>
+          <td>ARR</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">154,000</td>
+          <td style="text-align:right">90,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:58%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">58.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-4834</strong><br><small>Brikama Clean Cookstoves</small></td>
+          <td>2024</td>
+          <td>Clean Cooking</td>
+          <td>Kenya</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">150,000</td>
+          <td style="text-align:right">88,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:58%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">58.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-2103</strong><br><small>Bangladesh Clean Cooking Initiative</small></td>
+          <td>2024</td>
+          <td>Clean Cooking</td>
+          <td>Bangladesh</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">118,000</td>
+          <td style="text-align:right">62,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:52%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">52.5%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-3421</strong><br><small>Solar Water Pumps India</small></td>
+          <td>2024</td>
+          <td>Renewable Energy</td>
+          <td>India</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">108,000</td>
+          <td style="text-align:right">58,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:53%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">53.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0023</strong><br><small>Otter Creek Improved Forest Management</small></td>
+          <td>2024</td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">98,000</td>
+          <td style="text-align:right">42,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:42%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">42.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-5019</strong><br><small>Ethiopia Rural Solar Mini-Grids</small></td>
+          <td>2024</td>
+          <td>Renewable Energy</td>
+          <td>Ethiopia</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">82,000</td>
+          <td style="text-align:right">48,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:58%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">58.5%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0673</strong><br><small>Katingan Mentaya</small></td>
+          <td>2023</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,640,000</td>
+          <td style="text-align:right">980,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:59%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">59.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1360</strong><br><small>Amazon Sustainable Landscapes</small></td>
+          <td>2023</td>
+          <td>REDD+</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,350,000</td>
+          <td style="text-align:right">870,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:64%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">64.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1511</strong><br><small>Congo Basin REDD+</small></td>
+          <td>2023</td>
+          <td>REDD+</td>
+          <td>DRC</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,230,000</td>
+          <td style="text-align:right">780,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:63%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">63.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0271</strong><br><small>Sumatra Forest Conservation</small></td>
+          <td>2023</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">920,000</td>
+          <td style="text-align:right">580,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:63%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">63.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0634</strong><br><small>Madre de Dios Amazon Conservation</small></td>
+          <td>2023</td>
+          <td>REDD+</td>
+          <td>Peru</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">800,000</td>
+          <td style="text-align:right">500,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:62%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">62.5%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0612</strong><br><small>Cardamom Mountains REDD+</small></td>
+          <td>2023</td>
+          <td>REDD+</td>
+          <td>Cambodia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">490,000</td>
+          <td style="text-align:right">290,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:59%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">59.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0011</strong><br><small>Northern Australia Savanna Burning</small></td>
+          <td>2023</td>
+          <td>Fire Management</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">345,000</td>
+          <td style="text-align:right">230,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:66%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">66.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0567</strong><br><small>US Landfill Gas Recovery</small></td>
+          <td>2023</td>
+          <td>Methane Avoidance</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">210,000</td>
+          <td style="text-align:right">158,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:75%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">75.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1243</strong><br><small>Andean Reforestation Colombia</small></td>
+          <td>2023</td>
+          <td>ARR</td>
+          <td>Colombia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">172,000</td>
+          <td style="text-align:right">118,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:68%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">68.6%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>CAR-0234</strong><br><small>California Grassland Carbon</small></td>
+          <td>2023</td>
+          <td>Soil Carbon</td>
+          <td>USA</td>
+          <td>CAR</td>
+          <td style="text-align:right">148,000</td>
+          <td style="text-align:right">102,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:68%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">68.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-4834</strong><br><small>Brikama Clean Cookstoves</small></td>
+          <td>2023</td>
+          <td>Clean Cooking</td>
+          <td>Kenya</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">145,000</td>
+          <td style="text-align:right">105,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:72%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">72.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0045</strong><br><small>Mallee Eucalyptus Plantings</small></td>
+          <td>2023</td>
+          <td>ARR</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">144,000</td>
+          <td style="text-align:right">106,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:73%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">73.6%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-2103</strong><br><small>Bangladesh Clean Cooking Initiative</small></td>
+          <td>2023</td>
+          <td>Clean Cooking</td>
+          <td>Bangladesh</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">108,000</td>
+          <td style="text-align:right">78,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:72%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">72.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-3421</strong><br><small>Solar Water Pumps India</small></td>
+          <td>2023</td>
+          <td>Renewable Energy</td>
+          <td>India</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">102,000</td>
+          <td style="text-align:right">74,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:72%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">72.5%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0023</strong><br><small>Otter Creek Improved Forest Management</small></td>
+          <td>2023</td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">91,000</td>
+          <td style="text-align:right">60,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:65%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">65.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-5019</strong><br><small>Ethiopia Rural Solar Mini-Grids</small></td>
+          <td>2023</td>
+          <td>Renewable Energy</td>
+          <td>Ethiopia</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">74,000</td>
+          <td style="text-align:right">58,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:78%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">78.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0673</strong><br><small>Katingan Mentaya</small></td>
+          <td>2022</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,580,000</td>
+          <td style="text-align:right">1,080,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:68%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">68.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1360</strong><br><small>Amazon Sustainable Landscapes</small></td>
+          <td>2022</td>
+          <td>REDD+</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,290,000</td>
+          <td style="text-align:right">940,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:72%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">72.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1511</strong><br><small>Congo Basin REDD+</small></td>
+          <td>2022</td>
+          <td>REDD+</td>
+          <td>DRC</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,150,000</td>
+          <td style="text-align:right">820,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:71%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">71.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0271</strong><br><small>Sumatra Forest Conservation</small></td>
+          <td>2022</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">890,000</td>
+          <td style="text-align:right">620,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:69%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">69.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0634</strong><br><small>Madre de Dios Amazon Conservation</small></td>
+          <td>2022</td>
+          <td>REDD+</td>
+          <td>Peru</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">770,000</td>
+          <td style="text-align:right">540,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:70%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">70.1%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0612</strong><br><small>Cardamom Mountains REDD+</small></td>
+          <td>2022</td>
+          <td>REDD+</td>
+          <td>Cambodia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">460,000</td>
+          <td style="text-align:right">320,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:69%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">69.6%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0011</strong><br><small>Northern Australia Savanna Burning</small></td>
+          <td>2022</td>
+          <td>Fire Management</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">330,000</td>
+          <td style="text-align:right">248,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:75%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">75.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0052</strong><br><small>Nova Vida Reforestation</small></td>
+          <td>2022</td>
+          <td>ARR</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">268,000</td>
+          <td style="text-align:right">268,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:100%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">100.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0567</strong><br><small>US Landfill Gas Recovery</small></td>
+          <td>2022</td>
+          <td>Methane Avoidance</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">196,000</td>
+          <td style="text-align:right">162,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:82%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">82.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1243</strong><br><small>Andean Reforestation Colombia</small></td>
+          <td>2022</td>
+          <td>ARR</td>
+          <td>Colombia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">155,000</td>
+          <td style="text-align:right">122,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:78%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">78.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-4834</strong><br><small>Brikama Clean Cookstoves</small></td>
+          <td>2022</td>
+          <td>Clean Cooking</td>
+          <td>Kenya</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">138,000</td>
+          <td style="text-align:right">112,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>CAR-0234</strong><br><small>California Grassland Carbon</small></td>
+          <td>2022</td>
+          <td>Soil Carbon</td>
+          <td>USA</td>
+          <td>CAR</td>
+          <td style="text-align:right">135,000</td>
+          <td style="text-align:right">108,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:80%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">80.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0045</strong><br><small>Mallee Eucalyptus Plantings</small></td>
+          <td>2022</td>
+          <td>ARR</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">132,000</td>
+          <td style="text-align:right">108,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-2103</strong><br><small>Bangladesh Clean Cooking Initiative</small></td>
+          <td>2022</td>
+          <td>Clean Cooking</td>
+          <td>Bangladesh</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">96,000</td>
+          <td style="text-align:right">80,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:83%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">83.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-3421</strong><br><small>Solar Water Pumps India</small></td>
+          <td>2022</td>
+          <td>Renewable Energy</td>
+          <td>India</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">94,000</td>
+          <td style="text-align:right">78,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:82%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">83.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0023</strong><br><small>Otter Creek Improved Forest Management</small></td>
+          <td>2022</td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">82,000</td>
+          <td style="text-align:right">65,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:79%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">79.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-5019</strong><br><small>Ethiopia Rural Solar Mini-Grids</small></td>
+          <td>2022</td>
+          <td>Renewable Energy</td>
+          <td>Ethiopia</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">64,000</td>
+          <td style="text-align:right">52,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0673</strong><br><small>Katingan Mentaya</small></td>
+          <td>2021</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,500,000</td>
+          <td style="text-align:right">1,150,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:76%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">76.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1360</strong><br><small>Amazon Sustainable Landscapes</small></td>
+          <td>2021</td>
+          <td>REDD+</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,310,000</td>
+          <td style="text-align:right">1,050,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:80%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">80.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1511</strong><br><small>Congo Basin REDD+</small></td>
+          <td>2021</td>
+          <td>REDD+</td>
+          <td>DRC</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,060,000</td>
+          <td style="text-align:right">860,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.1%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0271</strong><br><small>Sumatra Forest Conservation</small></td>
+          <td>2021</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">850,000</td>
+          <td style="text-align:right">680,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:80%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">80.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0634</strong><br><small>Madre de Dios Amazon Conservation</small></td>
+          <td>2021</td>
+          <td>REDD+</td>
+          <td>Peru</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">740,000</td>
+          <td style="text-align:right">590,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:79%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">79.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0612</strong><br><small>Cardamom Mountains REDD+</small></td>
+          <td>2021</td>
+          <td>REDD+</td>
+          <td>Cambodia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">430,000</td>
+          <td style="text-align:right">350,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0011</strong><br><small>Northern Australia Savanna Burning</small></td>
+          <td>2021</td>
+          <td>Fire Management</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">310,000</td>
+          <td style="text-align:right">260,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:83%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">83.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0052</strong><br><small>Nova Vida Reforestation</small></td>
+          <td>2021</td>
+          <td>ARR</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">255,000</td>
+          <td style="text-align:right">232,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:90%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">91.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0567</strong><br><small>US Landfill Gas Recovery</small></td>
+          <td>2021</td>
+          <td>Methane Avoidance</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">182,000</td>
+          <td style="text-align:right">156,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:85%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">85.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1243</strong><br><small>Andean Reforestation Colombia</small></td>
+          <td>2021</td>
+          <td>ARR</td>
+          <td>Colombia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">138,000</td>
+          <td style="text-align:right">112,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-4834</strong><br><small>Brikama Clean Cookstoves</small></td>
+          <td>2021</td>
+          <td>Clean Cooking</td>
+          <td>Kenya</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">128,000</td>
+          <td style="text-align:right">108,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:84%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">84.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>CAR-0234</strong><br><small>California Grassland Carbon</small></td>
+          <td>2021</td>
+          <td>Soil Carbon</td>
+          <td>USA</td>
+          <td>CAR</td>
+          <td style="text-align:right">120,000</td>
+          <td style="text-align:right">98,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0045</strong><br><small>Mallee Eucalyptus Plantings</small></td>
+          <td>2021</td>
+          <td>ARR</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">120,000</td>
+          <td style="text-align:right">100,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:83%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">83.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>CAR-0456</strong><br><small>Oregon Forest Carbon Project</small></td>
+          <td>2021</td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>CAR</td>
+          <td style="text-align:right">118,000</td>
+          <td style="text-align:right">100,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:84%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">84.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-3421</strong><br><small>Solar Water Pumps India</small></td>
+          <td>2021</td>
+          <td>Renewable Energy</td>
+          <td>India</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">85,000</td>
+          <td style="text-align:right">72,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:84%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">84.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-2103</strong><br><small>Bangladesh Clean Cooking Initiative</small></td>
+          <td>2021</td>
+          <td>Clean Cooking</td>
+          <td>Bangladesh</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">84,000</td>
+          <td style="text-align:right">70,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:83%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">83.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0023</strong><br><small>Otter Creek Improved Forest Management</small></td>
+          <td>2021</td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">74,000</td>
+          <td style="text-align:right">62,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:83%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">83.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-1278</strong><br><small>Rwanda Wind Energy Project</small></td>
+          <td>2021</td>
+          <td>Renewable Energy</td>
+          <td>Rwanda</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">62,000</td>
+          <td style="text-align:right">62,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:100%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">100.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-5019</strong><br><small>Ethiopia Rural Solar Mini-Grids</small></td>
+          <td>2021</td>
+          <td>Renewable Energy</td>
+          <td>Ethiopia</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">52,000</td>
+          <td style="text-align:right">42,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:80%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">80.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0673</strong><br><small>Katingan Mentaya</small></td>
+          <td>2020</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,380,000</td>
+          <td style="text-align:right">1,200,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:86%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">87.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1360</strong><br><small>Amazon Sustainable Landscapes</small></td>
+          <td>2020</td>
+          <td>REDD+</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,240,000</td>
+          <td style="text-align:right">1,100,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:88%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">88.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1511</strong><br><small>Congo Basin REDD+</small></td>
+          <td>2020</td>
+          <td>REDD+</td>
+          <td>DRC</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">940,000</td>
+          <td style="text-align:right">800,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:85%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">85.1%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0271</strong><br><small>Sumatra Forest Conservation</small></td>
+          <td>2020</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">800,000</td>
+          <td style="text-align:right">700,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:87%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">87.5%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0634</strong><br><small>Madre de Dios Amazon Conservation</small></td>
+          <td>2020</td>
+          <td>REDD+</td>
+          <td>Peru</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">700,000</td>
+          <td style="text-align:right">610,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:87%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">87.1%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0612</strong><br><small>Cardamom Mountains REDD+</small></td>
+          <td>2020</td>
+          <td>REDD+</td>
+          <td>Cambodia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">410,000</td>
+          <td style="text-align:right">360,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:87%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">87.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0011</strong><br><small>Northern Australia Savanna Burning</small></td>
+          <td>2020</td>
+          <td>Fire Management</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">290,000</td>
+          <td style="text-align:right">250,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:86%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">86.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0052</strong><br><small>Nova Vida Reforestation</small></td>
+          <td>2020</td>
+          <td>ARR</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">242,000</td>
+          <td style="text-align:right">218,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:90%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">90.1%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0567</strong><br><small>US Landfill Gas Recovery</small></td>
+          <td>2020</td>
+          <td>Methane Avoidance</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">168,000</td>
+          <td style="text-align:right">148,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:88%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">88.1%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1243</strong><br><small>Andean Reforestation Colombia</small></td>
+          <td>2020</td>
+          <td>ARR</td>
+          <td>Colombia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">118,000</td>
+          <td style="text-align:right">96,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-4834</strong><br><small>Brikama Clean Cookstoves</small></td>
+          <td>2020</td>
+          <td>Clean Cooking</td>
+          <td>Kenya</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">115,000</td>
+          <td style="text-align:right">98,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:85%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">85.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>CAR-0456</strong><br><small>Oregon Forest Carbon Project</small></td>
+          <td>2020</td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>CAR</td>
+          <td style="text-align:right">108,000</td>
+          <td style="text-align:right">96,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:88%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">88.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0045</strong><br><small>Mallee Eucalyptus Plantings</small></td>
+          <td>2020</td>
+          <td>ARR</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">108,000</td>
+          <td style="text-align:right">90,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:83%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">83.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>CAR-0234</strong><br><small>California Grassland Carbon</small></td>
+          <td>2020</td>
+          <td>Soil Carbon</td>
+          <td>USA</td>
+          <td>CAR</td>
+          <td style="text-align:right">105,000</td>
+          <td style="text-align:right">80,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:76%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">76.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-3421</strong><br><small>Solar Water Pumps India</small></td>
+          <td>2020</td>
+          <td>Renewable Energy</td>
+          <td>India</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">74,000</td>
+          <td style="text-align:right">62,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:83%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">83.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-2103</strong><br><small>Bangladesh Clean Cooking Initiative</small></td>
+          <td>2020</td>
+          <td>Clean Cooking</td>
+          <td>Bangladesh</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">72,000</td>
+          <td style="text-align:right">58,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:80%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">80.6%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0023</strong><br><small>Otter Creek Improved Forest Management</small></td>
+          <td>2020</td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">68,000</td>
+          <td style="text-align:right">55,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:80%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">80.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-1278</strong><br><small>Rwanda Wind Energy Project</small></td>
+          <td>2020</td>
+          <td>Renewable Energy</td>
+          <td>Rwanda</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">60,000</td>
+          <td style="text-align:right">58,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:96%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">96.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0673</strong><br><small>Katingan Mentaya</small></td>
+          <td>2019</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,260,000</td>
+          <td style="text-align:right">1,090,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:86%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">86.5%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1360</strong><br><small>Amazon Sustainable Landscapes</small></td>
+          <td>2019</td>
+          <td>REDD+</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,180,000</td>
+          <td style="text-align:right">1,020,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:86%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">86.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1511</strong><br><small>Congo Basin REDD+</small></td>
+          <td>2019</td>
+          <td>REDD+</td>
+          <td>DRC</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">820,000</td>
+          <td style="text-align:right">690,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:84%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">84.1%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0271</strong><br><small>Sumatra Forest Conservation</small></td>
+          <td>2019</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">760,000</td>
+          <td style="text-align:right">670,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:88%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">88.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0634</strong><br><small>Madre de Dios Amazon Conservation</small></td>
+          <td>2019</td>
+          <td>REDD+</td>
+          <td>Peru</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">660,000</td>
+          <td style="text-align:right">580,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:87%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">87.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0612</strong><br><small>Cardamom Mountains REDD+</small></td>
+          <td>2019</td>
+          <td>REDD+</td>
+          <td>Cambodia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">380,000</td>
+          <td style="text-align:right">330,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:86%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">86.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0011</strong><br><small>Northern Australia Savanna Burning</small></td>
+          <td>2019</td>
+          <td>Fire Management</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">265,000</td>
+          <td style="text-align:right">225,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:84%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">84.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0052</strong><br><small>Nova Vida Reforestation</small></td>
+          <td>2019</td>
+          <td>ARR</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">228,000</td>
+          <td style="text-align:right">200,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:87%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">87.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0567</strong><br><small>US Landfill Gas Recovery</small></td>
+          <td>2019</td>
+          <td>Methane Avoidance</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">152,000</td>
+          <td style="text-align:right">134,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:88%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">88.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-4834</strong><br><small>Brikama Clean Cookstoves</small></td>
+          <td>2019</td>
+          <td>Clean Cooking</td>
+          <td>Kenya</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">102,000</td>
+          <td style="text-align:right">88,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:86%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">86.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1243</strong><br><small>Andean Reforestation Colombia</small></td>
+          <td>2019</td>
+          <td>ARR</td>
+          <td>Colombia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">98,000</td>
+          <td style="text-align:right">78,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:79%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">79.6%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>CAR-0456</strong><br><small>Oregon Forest Carbon Project</small></td>
+          <td>2019</td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>CAR</td>
+          <td style="text-align:right">96,000</td>
+          <td style="text-align:right">82,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:85%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">85.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0045</strong><br><small>Mallee Eucalyptus Plantings</small></td>
+          <td>2019</td>
+          <td>ARR</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">96,000</td>
+          <td style="text-align:right">78,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-3421</strong><br><small>Solar Water Pumps India</small></td>
+          <td>2019</td>
+          <td>Renewable Energy</td>
+          <td>India</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">62,000</td>
+          <td style="text-align:right">50,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:80%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">80.6%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-1278</strong><br><small>Rwanda Wind Energy Project</small></td>
+          <td>2019</td>
+          <td>Renewable Energy</td>
+          <td>Rwanda</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">58,000</td>
+          <td style="text-align:right">56,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:96%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">96.6%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0023</strong><br><small>Otter Creek Improved Forest Management</small></td>
+          <td>2019</td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">52,000</td>
+          <td style="text-align:right">40,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:76%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">76.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0673</strong><br><small>Katingan Mentaya</small></td>
+          <td>2018</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,140,000</td>
+          <td style="text-align:right">980,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:85%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">86.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1360</strong><br><small>Amazon Sustainable Landscapes</small></td>
+          <td>2018</td>
+          <td>REDD+</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,050,000</td>
+          <td style="text-align:right">900,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:85%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">85.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1511</strong><br><small>Congo Basin REDD+</small></td>
+          <td>2018</td>
+          <td>REDD+</td>
+          <td>DRC</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">720,000</td>
+          <td style="text-align:right">580,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:80%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">80.6%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0271</strong><br><small>Sumatra Forest Conservation</small></td>
+          <td>2018</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">710,000</td>
+          <td style="text-align:right">610,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:85%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">85.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0634</strong><br><small>Madre de Dios Amazon Conservation</small></td>
+          <td>2018</td>
+          <td>REDD+</td>
+          <td>Peru</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">610,000</td>
+          <td style="text-align:right">530,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:86%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">86.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0612</strong><br><small>Cardamom Mountains REDD+</small></td>
+          <td>2018</td>
+          <td>REDD+</td>
+          <td>Cambodia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">350,000</td>
+          <td style="text-align:right">300,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:85%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">85.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0011</strong><br><small>Northern Australia Savanna Burning</small></td>
+          <td>2018</td>
+          <td>Fire Management</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">240,000</td>
+          <td style="text-align:right">200,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:83%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">83.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0052</strong><br><small>Nova Vida Reforestation</small></td>
+          <td>2018</td>
+          <td>ARR</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">210,000</td>
+          <td style="text-align:right">182,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:86%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">86.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0567</strong><br><small>US Landfill Gas Recovery</small></td>
+          <td>2018</td>
+          <td>Methane Avoidance</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">138,000</td>
+          <td style="text-align:right">118,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:85%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">85.5%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-4834</strong><br><small>Brikama Clean Cookstoves</small></td>
+          <td>2018</td>
+          <td>Clean Cooking</td>
+          <td>Kenya</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">88,000</td>
+          <td style="text-align:right">72,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>CAR-0456</strong><br><small>Oregon Forest Carbon Project</small></td>
+          <td>2018</td>
+          <td>IFM</td>
+          <td>USA</td>
+          <td>CAR</td>
+          <td style="text-align:right">82,000</td>
+          <td style="text-align:right">68,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:82%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">82.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0045</strong><br><small>Mallee Eucalyptus Plantings</small></td>
+          <td>2018</td>
+          <td>ARR</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">82,000</td>
+          <td style="text-align:right">65,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:79%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">79.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-1278</strong><br><small>Rwanda Wind Energy Project</small></td>
+          <td>2018</td>
+          <td>Renewable Energy</td>
+          <td>Rwanda</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">55,000</td>
+          <td style="text-align:right">53,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:96%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">96.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0673</strong><br><small>Katingan Mentaya</small></td>
+          <td>2017</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">1,020,000</td>
+          <td style="text-align:right">860,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:84%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">84.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1360</strong><br><small>Amazon Sustainable Landscapes</small></td>
+          <td>2017</td>
+          <td>REDD+</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">910,000</td>
+          <td style="text-align:right">780,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:85%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">85.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0271</strong><br><small>Sumatra Forest Conservation</small></td>
+          <td>2017</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">640,000</td>
+          <td style="text-align:right">530,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:82%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">82.8%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0634</strong><br><small>Madre de Dios Amazon Conservation</small></td>
+          <td>2017</td>
+          <td>REDD+</td>
+          <td>Peru</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">560,000</td>
+          <td style="text-align:right">470,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:83%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">83.9%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0612</strong><br><small>Cardamom Mountains REDD+</small></td>
+          <td>2017</td>
+          <td>REDD+</td>
+          <td>Cambodia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">320,000</td>
+          <td style="text-align:right">260,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACCU-0011</strong><br><small>Northern Australia Savanna Burning</small></td>
+          <td>2017</td>
+          <td>Fire Management</td>
+          <td>Australia</td>
+          <td>ACCU</td>
+          <td style="text-align:right">210,000</td>
+          <td style="text-align:right">170,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:80%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0052</strong><br><small>Nova Vida Reforestation</small></td>
+          <td>2017</td>
+          <td>ARR</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">188,000</td>
+          <td style="text-align:right">158,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:84%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">84.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>ACR-0567</strong><br><small>US Landfill Gas Recovery</small></td>
+          <td>2017</td>
+          <td>Methane Avoidance</td>
+          <td>USA</td>
+          <td>ACR</td>
+          <td style="text-align:right">122,000</td>
+          <td style="text-align:right">100,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">82.0%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-1278</strong><br><small>Rwanda Wind Energy Project</small></td>
+          <td>2017</td>
+          <td>Renewable Energy</td>
+          <td>Rwanda</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">52,000</td>
+          <td style="text-align:right">50,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:96%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">96.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0673</strong><br><small>Katingan Mentaya</small></td>
+          <td>2016</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">900,000</td>
+          <td style="text-align:right">740,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:82%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">82.2%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-1360</strong><br><small>Amazon Sustainable Landscapes</small></td>
+          <td>2016</td>
+          <td>REDD+</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">820,000</td>
+          <td style="text-align:right">650,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:79%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">79.3%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0271</strong><br><small>Sumatra Forest Conservation</small></td>
+          <td>2016</td>
+          <td>REDD+</td>
+          <td>Indonesia</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">590,000</td>
+          <td style="text-align:right">480,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:81%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">81.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0634</strong><br><small>Madre de Dios Amazon Conservation</small></td>
+          <td>2016</td>
+          <td>REDD+</td>
+          <td>Peru</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">510,000</td>
+          <td style="text-align:right">420,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:82%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">82.4%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0052</strong><br><small>Nova Vida Reforestation</small></td>
+          <td>2016</td>
+          <td>ARR</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">165,000</td>
+          <td style="text-align:right">138,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:83%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">83.6%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>GS-1278</strong><br><small>Rwanda Wind Energy Project</small></td>
+          <td>2016</td>
+          <td>Renewable Energy</td>
+          <td>Rwanda</td>
+          <td>Gold Standard</td>
+          <td style="text-align:right">48,000</td>
+          <td style="text-align:right">44,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:91%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">91.7%</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>VCS-0052</strong><br><small>Nova Vida Reforestation</small></td>
+          <td>2015</td>
+          <td>ARR</td>
+          <td>Brazil</td>
+          <td>Verra VCS</td>
+          <td style="text-align:right">140,000</td>
+          <td style="text-align:right">110,000</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="background:#E2E8F0;border-radius:4px;width:80px;height:10px;overflow:hidden">
+                <div style="background:#10B981;width:78%;height:100%;border-radius:4px"></div>
+              </div>
+              <span style="font-size:0.8rem">78.6%</span>
+            </div>
+          </td>
+        </tr></tbody>
+    </table>
+      <button class="download-btn" onclick="downloadCSV()">Download CSV</button>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+function filterTable(tableId, inputId) {
+  const q = document.getElementById(inputId).value.toLowerCase();
+  document.querySelectorAll('#' + tableId + ' tbody tr').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+function downloadCSV() {
+  const table = document.getElementById('issuances-table');
+  const rows = [...table.querySelectorAll('tr')].map(r =>
+    [...r.querySelectorAll('th,td')].map(c => '"' + c.innerText.replace(/"/g,'""').replace(/\n/g,' ') + '"').join(',')
+  );
+  const blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'carbon_issuances.csv';
+  a.click();
+}
+</script>
+</body>
+</html>
