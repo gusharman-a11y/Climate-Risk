@@ -19,6 +19,7 @@ from modules.scoring import (
 )
 from modules.disclosure import generate_pillar_disclosures, generate_all_disclosures
 from modules.pdf_export import generate_pdf
+from modules.carbon_market import render as render_carbon_market
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -67,6 +68,7 @@ PILLAR_ICONS = {
     "Strategy": "🎯",
     "Risk Management": "⚠️",
     "Metrics & Targets": "📊",
+    "Carbon Market": "🌱",
 }
 
 PAGES = [
@@ -77,6 +79,7 @@ PAGES = [
     "Metrics & Targets",
     "Gap Assessment",
     "Disclosure Drafts",
+    "Carbon Market",
     "Export",
 ]
 
@@ -627,5 +630,7 @@ elif page == "Gap Assessment":
     page_gap_assessment()
 elif page == "Disclosure Drafts":
     page_disclosure_drafts()
+elif page == "Carbon Market":
+    render_carbon_market()
 elif page == "Export":
     page_export()
