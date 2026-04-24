@@ -306,7 +306,39 @@ def _synthesise_monthly(seeds: Iterable[_ProjectSeed]) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def load_dataset() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return (projects_df, issuances_df)."""
+    """Return (projects_df, issuances_df).
+
+    Prefers real CER data cached under ``data_cache/`` (populated by
+    ``python -m modules.cer_fetch``). Falls back to the illustrative sample
+    bundled in this module so the dashboard is always usable out of the box.
+    """
+    from modules import cer_fetch
+
+    reg_path = cer_fetch.cached_register_path()
+    iss_path = cer_fetch.cached_issuance_path()
+    if reg_path is not None:
+        try:
+            projects = _load_cer_register(reg_path)
+            issuances = (
+                _load_cer_issuances(iss_path, projects)
+                if iss_path is not None
+                else _issuances_from_totals(projects)
+            )
+            projects = _attach_totals(projects, issuances)
+            return projects, issuances
+        except Exception as exc:
+            # If the cached file's schema is unfamiliar, surface it in the UI
+            # via the sample data path – never crash the whole dashboard.
+            st.warning(
+                f"Couldn't parse cached CER file ({reg_path.name}): {exc}. "
+                "Falling back to sample data. Run "
+                "`python -m modules.cer_fetch --refresh` or re-supply the file."
+            )
+
+    return _sample_dataset()
+
+
+def _sample_dataset() -> tuple[pd.DataFrame, pd.DataFrame]:
     seeds = _project_seeds()
     projects = pd.DataFrame([{
         "project_id": s.pid,
@@ -323,6 +355,196 @@ def load_dataset() -> tuple[pd.DataFrame, pd.DataFrame]:
     } for s in seeds])
     issuances = _synthesise_monthly(seeds)
     return projects, issuances
+
+
+# ── CER data adapters ─────────────────────────────────────────────────────────
+
+_REGISTER_COLUMN_ALIASES: dict[str, list[str]] = {
+    "project_id": ["project id", "project no", "project number", "erf id", "id"],
+    "project_name": ["project name", "name", "title"],
+    "developer": [
+        "project proponent", "proponent", "project developer", "developer",
+        "representative", "aggregator",
+    ],
+    "method": ["method", "method name", "methodology"],
+    "state": ["state", "state/territory", "jurisdiction"],
+    "status": ["project status", "status"],
+    "registered": [
+        "declaration date", "project declaration date", "registration date",
+        "date registered",
+    ],
+    "crediting_start": [
+        "crediting period start", "crediting period start date",
+        "crediting start date",
+    ],
+    "crediting_end": [
+        "crediting period end", "crediting period end date",
+        "crediting end date",
+    ],
+    "total_accus_issued": [
+        "accus issued", "total accus issued", "total units issued",
+        "units issued", "accus issued to date",
+    ],
+}
+
+_ISSUANCE_COLUMN_ALIASES: dict[str, list[str]] = {
+    "project_id": ["project id", "project no", "project number", "erf id"],
+    "issuance_month": [
+        "issuance date", "issued date", "date of issuance", "date issued",
+        "issuance month", "month", "date",
+    ],
+    "accus_issued": [
+        "accus issued", "units issued", "quantity", "volume", "amount issued",
+    ],
+}
+
+
+def _read_tabular(path) -> pd.DataFrame:
+    suffix = str(path).lower()
+    if suffix.endswith(".csv"):
+        return pd.read_csv(path)
+    # Excel — openpyxl handles .xlsx, xlrd handles .xls
+    return pd.read_excel(path, sheet_name=0)
+
+
+def _normalise_columns(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df.columns = [str(c).strip().lower() for c in df.columns]
+    return df
+
+
+def _rename_by_aliases(df: pd.DataFrame, aliases: dict[str, list[str]]) -> pd.DataFrame:
+    rename: dict[str, str] = {}
+    for target, candidates in aliases.items():
+        for c in candidates:
+            if c in df.columns and target not in rename.values():
+                rename[c] = target
+                break
+    return df.rename(columns=rename)
+
+
+def _load_cer_register(path) -> pd.DataFrame:
+    raw = _normalise_columns(_read_tabular(path))
+    df = _rename_by_aliases(raw, _REGISTER_COLUMN_ALIASES)
+
+    required = {"project_id", "project_name", "method", "state", "status"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"register file missing expected columns: {sorted(missing)}. "
+            f"Got: {list(raw.columns)[:20]}…"
+        )
+
+    if "developer" not in df.columns:
+        df["developer"] = "(unspecified proponent)"
+    for dt_col in ("registered", "crediting_start", "crediting_end"):
+        if dt_col in df.columns:
+            df[dt_col] = pd.to_datetime(df[dt_col], errors="coerce")
+        else:
+            df[dt_col] = pd.NaT
+
+    if "crediting_years" not in df.columns:
+        delta = (df["crediting_end"] - df["crediting_start"]).dt.days / 365.25
+        df["crediting_years"] = delta.round().astype("Int64")
+
+    df["method_category"] = df["method"].map(_guess_method_category)
+
+    if "total_accus_issued" in df.columns:
+        df["total_accus_issued"] = (
+            pd.to_numeric(df["total_accus_issued"], errors="coerce").fillna(0).astype(int)
+        )
+    else:
+        df["total_accus_issued"] = 0
+
+    df["project_id"] = df["project_id"].astype(str).str.strip()
+    df["developer"] = df["developer"].astype(str).str.strip()
+    df["state"] = df["state"].astype(str).str.strip().str.upper()
+
+    keep = [
+        "project_id", "project_name", "developer", "method", "method_category",
+        "state", "registered", "crediting_start", "crediting_years",
+        "status", "total_accus_issued",
+    ]
+    return df[keep].drop_duplicates(subset=["project_id"]).reset_index(drop=True)
+
+
+def _load_cer_issuances(path, projects: pd.DataFrame) -> pd.DataFrame:
+    raw = _normalise_columns(_read_tabular(path))
+    df = _rename_by_aliases(raw, _ISSUANCE_COLUMN_ALIASES)
+
+    required = {"project_id", "accus_issued"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"issuance file missing expected columns: {sorted(missing)}. "
+            f"Got: {list(raw.columns)[:20]}…"
+        )
+
+    df["project_id"] = df["project_id"].astype(str).str.strip()
+    df["accus_issued"] = (
+        pd.to_numeric(df["accus_issued"], errors="coerce").fillna(0).astype(int)
+    )
+
+    if "issuance_month" in df.columns:
+        df["issuance_month"] = pd.to_datetime(df["issuance_month"], errors="coerce")
+        df["issuance_month"] = df["issuance_month"].dt.to_period("M").dt.to_timestamp()
+    else:
+        df["issuance_month"] = pd.NaT
+
+    # Enrich with project metadata for the Issuances tab.
+    meta = projects[["project_id", "project_name", "developer", "method", "state"]]
+    df = df.merge(meta, on="project_id", how="left")
+    df = df[df["accus_issued"] > 0]
+    return df.reset_index(drop=True)
+
+
+def _issuances_from_totals(projects: pd.DataFrame) -> pd.DataFrame:
+    """If we have the register but no issuance table, emit a single row per
+    project dated at its crediting start so the Overview tab still works."""
+    if "total_accus_issued" not in projects.columns:
+        return pd.DataFrame(columns=[
+            "project_id", "project_name", "developer", "method", "state",
+            "issuance_month", "accus_issued",
+        ])
+    df = projects[projects["total_accus_issued"] > 0].copy()
+    df["issuance_month"] = (
+        df["crediting_start"].fillna(df["registered"]).dt.to_period("M").dt.to_timestamp()
+    )
+    df["accus_issued"] = df["total_accus_issued"]
+    return df[[
+        "project_id", "project_name", "developer", "method", "state",
+        "issuance_month", "accus_issued",
+    ]].reset_index(drop=True)
+
+
+def _attach_totals(projects: pd.DataFrame, issuances: pd.DataFrame) -> pd.DataFrame:
+    if issuances.empty:
+        return projects
+    totals = issuances.groupby("project_id")["accus_issued"].sum()
+    projects = projects.copy()
+    projects["total_accus_issued"] = (
+        projects["project_id"].map(totals).fillna(projects["total_accus_issued"]).astype(int)
+    )
+    return projects
+
+
+def _guess_method_category(method: str) -> str:
+    if not isinstance(method, str):
+        return "Other"
+    m = method.lower()
+    if any(k in m for k in ("regener", "planting", "forest", "vegetation", "deforest", "reforest")):
+        return "Vegetation"
+    if "savanna" in m or "fire" in m:
+        return "Savanna"
+    if "landfill" in m or "waste" in m or "alternative waste" in m:
+        return "Waste & Energy"
+    if "soil" in m or "herd" in m or "agri" in m or "dairy" in m or "piggery" in m:
+        return "Agriculture"
+    if "fugitive" in m or "mine" in m or "industrial" in m or "energy eff" in m:
+        return "Industrial"
+    if "transport" in m:
+        return "Transport"
+    return "Other"
 
 
 # ── Filtering ─────────────────────────────────────────────────────────────────
@@ -667,13 +889,49 @@ def _tab_issuances(issuances: pd.DataFrame) -> None:
 # ── Public entrypoint ─────────────────────────────────────────────────────────
 
 
+def _data_source_banner() -> None:
+    """Tell the user whether the dashboard is on live CER data or the sample."""
+    from modules import cer_fetch
+
+    reg = cer_fetch.cached_register_path()
+    iss = cer_fetch.cached_issuance_path()
+
+    col1, col2 = st.columns([5, 1])
+    with col1:
+        if reg is not None:
+            iss_label = iss.name if iss is not None else "none"
+            st.success(
+                f"**Live CER data** · register: `{reg.name}` · issuances: `{iss_label}`"
+            )
+        else:
+            st.info(
+                "**Sample data** in use. To load every ACCU project from the "
+                "CER, run `python -m modules.cer_fetch` once — the dashboard "
+                "will pick the cache up automatically."
+            )
+    with col2:
+        if st.button("🔄 Refresh CER", use_container_width=True,
+                     help="Re-run the one-shot download from cer.gov.au"):
+            with st.spinner("Downloading from cer.gov.au…"):
+                try:
+                    cer_fetch.fetch_register(force=True)
+                    cer_fetch.fetch_issuances(force=True)
+                    load_dataset.clear()
+                    st.success("CER data refreshed.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Fetch failed: {exc}")
+
+
 def render() -> None:
     st.title("🌱 Carbon Market Dashboard – ACCU scheme")
     st.caption(
         "Project developers, projects and Australian Carbon Credit Unit (ACCU) "
-        "issuances. Sample dataset for illustration; wire a live CER export in "
-        "`modules/carbon_market.py::load_dataset` to use real data."
+        "issuances. Pulls the full CER project register + issuance tables when "
+        "available locally, with a one-shot downloader for refresh."
     )
+
+    _data_source_banner()
 
     projects_all, issuances_all = load_dataset()
 
@@ -695,12 +953,21 @@ def render() -> None:
                 key="cm_f_dev",
             )
         with col4:
-            y_min = int(issuances_all["issuance_month"].dt.year.min())
-            y_max = int(issuances_all["issuance_month"].dt.year.max())
-            f_years = st.slider(
-                "Issuance year range", min_value=y_min, max_value=y_max,
-                value=(y_min, y_max), key="cm_f_years",
-            )
+            years = issuances_all["issuance_month"].dropna().dt.year
+            if years.empty:
+                y_min = y_max = pd.Timestamp.today().year
+                f_years = (y_min, y_max)
+                st.caption(f"Issuance year: {y_min}")
+            else:
+                y_min, y_max = int(years.min()), int(years.max())
+                if y_min == y_max:
+                    f_years = (y_min, y_max)
+                    st.caption(f"Issuance year: {y_min}")
+                else:
+                    f_years = st.slider(
+                        "Issuance year range", min_value=y_min, max_value=y_max,
+                        value=(y_min, y_max), key="cm_f_years",
+                    )
 
     projects, issuances = _apply_filters(
         projects_all, issuances_all, f_methods, f_states, f_devs, f_years,
