@@ -19,6 +19,8 @@ from modules.scoring import (
 )
 from modules.disclosure import generate_pillar_disclosures, generate_all_disclosures
 from modules.pdf_export import generate_pdf
+from modules import accu_methods
+from modules.pptx_export import build_pptx
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -67,6 +69,7 @@ PILLAR_ICONS = {
     "Strategy": "🎯",
     "Risk Management": "⚠️",
     "Metrics & Targets": "📊",
+    "ACCU Methods": "🌱",
 }
 
 PAGES = [
@@ -78,6 +81,7 @@ PAGES = [
     "Gap Assessment",
     "Disclosure Drafts",
     "Export",
+    "ACCU Methods",
 ]
 
 # ── Session state init ─────────────────────────────────────────────────────────
@@ -616,6 +620,139 @@ def page_export() -> None:
     )
 
 
+def page_accu_methods() -> None:
+    st.title("🌱 ACCU Methods Overview")
+    st.caption(
+        "Australian Carbon Credit Unit (ACCU) methods grouped by category, "
+        "with status (Active, Next to Close, Under Development) for each. "
+        "Edit inline and export to a Pollination-style PowerPoint slide."
+    )
+
+    if "accu_data" not in st.session_state:
+        st.session_state.accu_data = accu_methods.load_data()
+
+    data = st.session_state.accu_data
+
+    # ── Headline + insights editors ─────────────────────────────────────────
+    with st.expander("Slide headline & key insights", expanded=False):
+        data["eyebrow"] = st.text_input("Eyebrow", value=data.get("eyebrow", ""))
+        data["headline"] = st.text_area(
+            "Headline", value=data.get("headline", ""), height=70,
+        )
+        insights_text = st.text_area(
+            "Key insights (one bullet per line)",
+            value="\n\n".join(data.get("key_insights", [])),
+            height=180,
+        )
+        data["key_insights"] = [
+            line.strip() for line in insights_text.split("\n\n") if line.strip()
+        ]
+        data["footnote"] = st.text_area(
+            "Footnote", value=data.get("footnote", ""), height=70,
+        )
+        sources_text = st.text_area(
+            "Sources (one per line)",
+            value="\n".join(data.get("sources", [])),
+            height=100,
+        )
+        data["sources"] = [s.strip() for s in sources_text.split("\n") if s.strip()]
+
+    # ── KPI row ─────────────────────────────────────────────────────────────
+    counts = accu_methods.status_counts(data)
+    kpi = st.columns(4)
+    kpi[0].metric("Total methods", len(data["methods"]))
+    kpi[1].metric("Active", counts["active"])
+    kpi[2].metric("Next to Close", counts["next_to_close"])
+    kpi[3].metric("Under Development", counts["under_development"])
+
+    st.markdown("---")
+
+    # ── Editable methods table (data_editor) ────────────────────────────────
+    st.markdown("### Methods")
+    df = pd.DataFrame(data["methods"])
+    if df.empty:
+        df = pd.DataFrame(columns=accu_methods.COLUMNS)
+    # ensure all expected columns exist
+    for c in accu_methods.COLUMNS:
+        if c not in df.columns:
+            df[c] = ""
+    df = df[accu_methods.COLUMNS]
+
+    edited = st.data_editor(
+        df,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "methodology": st.column_config.TextColumn("Methodology", width="large"),
+            "category": st.column_config.SelectboxColumn(
+                "Category", options=accu_methods.CATEGORIES, required=True,
+            ),
+            "status": st.column_config.SelectboxColumn(
+                "Status",
+                options=accu_methods.STATUSES,
+                required=True,
+                help="active / next_to_close / under_development",
+            ),
+            "status_timing": st.column_config.TextColumn("Status / Timing"),
+            "updates": st.column_config.TextColumn("Updates", width="medium"),
+        },
+        key="accu_methods_editor",
+    )
+    data["methods"] = edited.to_dict(orient="records")
+
+    # ── Grouped preview by category ─────────────────────────────────────────
+    st.markdown("### Preview – grouped by category")
+    grouped = accu_methods.methods_by_category(data)
+    for cat in accu_methods.CATEGORIES:
+        rows = grouped[cat]
+        if not rows:
+            continue
+        color = accu_methods.CATEGORY_COLORS[cat]
+        st.markdown(
+            f'<div style="background:{color};color:white;padding:6px 12px;'
+            f'border-radius:4px;font-weight:600;font-size:0.9rem;'
+            f'margin-top:0.6rem;">{cat.upper()} '
+            f'<span style="opacity:0.8;font-weight:400;">'
+            f'({len(rows)} methods)</span></div>',
+            unsafe_allow_html=True,
+        )
+        prev = pd.DataFrame(rows)[
+            ["methodology", "status", "status_timing", "updates"]
+        ].copy()
+        prev["status"] = prev["status"].map(
+            lambda s: accu_methods.STATUS_LABELS.get(s, s)
+        )
+        prev.columns = ["Methodology", "Status", "Timing", "Updates"]
+        st.dataframe(prev, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+
+    # ── Action buttons ──────────────────────────────────────────────────────
+    btns = st.columns(3)
+    with btns[0]:
+        if st.button("💾 Save", use_container_width=True, type="primary"):
+            accu_methods.save_data(data)
+            st.success("ACCU methods data saved.")
+    with btns[1]:
+        if st.button("↺ Reset to defaults", use_container_width=True):
+            st.session_state.accu_data = accu_methods.reset_data()
+            st.rerun()
+    with btns[2]:
+        if st.button("📤 Build slide", use_container_width=True):
+            st.session_state.accu_pptx_bytes = build_pptx(data)
+            st.success("Slide built – download below.")
+
+    if st.session_state.get("accu_pptx_bytes"):
+        st.download_button(
+            label="⬇️  Download Pollination slide (.pptx)",
+            data=st.session_state.accu_pptx_bytes,
+            file_name="ACCU_Methods_Overview.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            type="primary",
+        )
+
+
 # ── Router ─────────────────────────────────────────────────────────────────────
 page = st.session_state.page
 
@@ -629,3 +766,5 @@ elif page == "Disclosure Drafts":
     page_disclosure_drafts()
 elif page == "Export":
     page_export()
+elif page == "ACCU Methods":
+    page_accu_methods()

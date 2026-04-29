@@ -1,3 +1,4 @@
 modules/__pycache__/
 clients/
 *.pyc
+accu_methods_data.json
