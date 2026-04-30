@@ -1,5 +1,4 @@
 modules/__pycache__/
 clients/
 data_cache/
-dist/
 *.pyc
