@@ -22,6 +22,7 @@ ASEAN_AU_NZ_JP = {
 
 # Canonical column names the rest of the app expects.
 CANON = {
+    "sbti_id": "SBTi ID",
     "company": "Company Name",
     "isin": "ISIN",
     "lei": "LEI",
@@ -30,21 +31,30 @@ CANON = {
     "sector": "Sector",
     "industry": "Industry",
     "org_type": "Organization Type",
-    "action": "Action",
     "target": "Target",
     "target_class": "Target Classification",
+    "target_class_long": "Target Classification (Long)",
     "target_year": "Target Year",
     "base_year": "Base Year",
-    "status": "Status",
     "near_term_status": "Near-term Status",
+    "long_term_status": "Long-term Status",
+    "long_term_target_class": "Long-term Target Classification",
+    "long_term_target_year": "Long-term Target Year",
+    "net_zero_status": "Net-Zero Status",
     "net_zero_year": "Net-Zero Year",
+    "ba15_status": "BA1.5 Status",
+    "ba15_date": "BA1.5 Date",
     "ambition": "Ambition",
+    "removal_reason": "Removal/Extension Reason",
     "date_committed": "Date Committed",
     "date_published": "Date Published",
+    "date_updated": "Date Updated",
 }
 
 # Common header variants seen in SBTi exports → canonical name.
+# Keys are lowercased with underscores/hyphens collapsed to single spaces.
 ALIASES = {
+    "sbti id": "sbti_id",
     "company name": "company",
     "company": "company",
     "isin": "isin",
@@ -55,38 +65,49 @@ ALIASES = {
     "sector": "sector",
     "primary sector": "sector",
     "industry": "industry",
-    "primary sub-sector": "industry",
+    "primary sub sector": "industry",
     "organization type": "org_type",
     "company classification": "org_type",
-    "action": "action",
+    "full target language": "target",
     "target wording": "target",
     "target": "target",
     "target classification": "target_class",
-    "target classification (short)": "target_class",
-    "near term - target classification": "target_class",
+    "target classification short": "target_class",
+    "near term target classification": "target_class",
+    "target classification long": "target_class_long",
+    "long term target classification": "long_term_target_class",
+    "near term target year": "target_year",
     "target year": "target_year",
-    "near-term - target year": "target_year",
+    "near term base year": "base_year",
     "base year": "base_year",
-    "near-term - base year": "base_year",
-    "status": "status",
-    "near-term - target status": "near_term_status",
-    "near term - target status": "near_term_status",
-    "net-zero year": "net_zero_year",
-    "long term - target year": "net_zero_year",
+    "near term status": "near_term_status",
+    "near term target status": "near_term_status",
+    "status": "near_term_status",
+    "long term status": "long_term_status",
+    "long term target year": "long_term_target_year",
+    "net zero status": "net_zero_status",
+    "net zero year": "net_zero_year",
+    "ba15 status": "ba15_status",
+    "ba1.5 status": "ba15_status",
+    "ba15 date": "ba15_date",
+    "ba1.5 date": "ba15_date",
     "ambition": "ambition",
-    "near-term - ambition": "ambition",
-    "date - committed": "date_committed",
+    "near term ambition": "ambition",
+    "reason for extension or removal": "removal_reason",
+    "removal reason": "removal_reason",
     "date committed": "date_committed",
-    "date - published": "date_published",
-    "date published": "date_published",
     "target submitted to sbti": "date_committed",
+    "date published": "date_published",
+    "date updated": "date_updated",
+    "date update": "date_updated",
 }
 
 
 def _normalise_columns(df: pd.DataFrame) -> pd.DataFrame:
     rename = {}
     for col in df.columns:
-        key = re.sub(r"\s+", " ", str(col)).strip().lower()
+        key = str(col).strip().lower().replace("_", " ").replace("-", " ")
+        key = re.sub(r"\s+", " ", key).strip()
         if key in ALIASES:
             rename[col] = CANON[ALIASES[key]]
     df = df.rename(columns=rename)
@@ -212,39 +233,63 @@ def _to_int(v) -> int | None:
         return None
 
 
+def _status_score(value: str) -> int:
+    v = value.strip().lower()
+    if not v or v == "nan":
+        return 0
+    if "removed" in v:
+        return -2
+    if "expired" in v:
+        return -1
+    if "targets set" in v or "validated" in v or "approved" in v:
+        return 3
+    if "committed" in v:
+        return 1
+    return 0
+
+
 def _score_row(row: pd.Series) -> dict:
-    status = str(row.get(CANON["status"], "")).strip().lower()
-    near_term = str(row.get(CANON["near_term_status"], "")).strip().lower()
-    ambition = str(row.get(CANON["ambition"], "")).strip().lower()
+    near_term = str(row.get(CANON["near_term_status"], ""))
+    long_term = str(row.get(CANON["long_term_status"], ""))
+    nz_status = str(row.get(CANON["net_zero_status"], ""))
+    ambition_long = str(row.get(CANON["target_class_long"], ""))
+    ambition_short = str(row.get(CANON["target_class"], ""))
+    ambition_field = str(row.get(CANON["ambition"], ""))
+    removal_reason = str(row.get(CANON["removal_reason"], "")).strip()
+
     target_year = _to_int(row.get(CANON["target_year"]))
-    nz_year = _to_int(row.get(CANON["net_zero_year"]))
+    nz_year = _to_int(row.get(CANON["net_zero_year"])) or _to_int(row.get(CANON["long_term_target_year"]))
 
-    # 1. Status (max 3, min -2)
-    status_pts = 0
-    for key, pts in STATUS_POINTS.items():
-        if key in status or key in near_term:
-            status_pts = max(status_pts, pts) if pts >= 0 else min(status_pts, pts)
-    if not status_pts and ("removed" in status or "removed" in near_term):
-        status_pts = -2
+    # 1. Near-term status (−2..3)
+    status_pts = _status_score(near_term)
 
-    # 2. Ambition (max 3)
+    # 2. Ambition — combine all three classification fields, take best (0..3)
+    ambition_blob = " ".join([ambition_long, ambition_short, ambition_field]).lower()
     ambition_pts = 0
     for key, pts in AMBITION_POINTS.items():
-        if key in ambition:
+        if key in ambition_blob:
             ambition_pts = max(ambition_pts, pts)
 
-    # 3. Net-zero commitment (1)
-    nz_pts = 1 if nz_year else 0
+    # 3. Net-zero commitment (0..2): year set + status validated
+    nz_pts = 0
+    if nz_year:
+        nz_pts += 1
+    nz_status_pts = _status_score(nz_status)
+    lt_status_pts = _status_score(long_term)
+    if max(nz_status_pts, lt_status_pts) >= 3:
+        nz_pts += 1
 
-    # 4. Target-year freshness — penalise expired without renewal (-2)
+    # 4. Expired/removed penalty (−2..0)
     this_year = datetime.utcnow().year
     expired_pts = 0
-    if target_year and target_year < this_year and "set" not in status:
+    if removal_reason and removal_reason.lower() not in {"nan", "none", ""}:
+        expired_pts = -2
+    elif target_year and target_year < this_year and "targets set" not in near_term.lower():
         expired_pts = -2
 
-    # 5. Disclosure recency (max 2)
+    # 5. Disclosure recency (0..2) — prefer date_updated, then published, then committed
     rec_pts = 0
-    for col in (CANON["date_published"], CANON["date_committed"]):
+    for col in (CANON["date_updated"], CANON["date_published"], CANON["date_committed"], CANON["ba15_date"]):
         d = pd.to_datetime(row.get(col), errors="coerce")
         if pd.notna(d):
             age = (datetime.utcnow() - d.to_pydatetime()).days / 365.25

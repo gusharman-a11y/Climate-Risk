@@ -231,8 +231,9 @@ with tab_offtrack:
 
     show_cols = [
         CANON["company"], CANON["country"], CANON["sector"], "ASRS Tier",
-        CANON["status"], CANON["near_term_status"], CANON["target_year"],
-        CANON["net_zero_year"], CANON["ambition"], "Composite Score", "RAG",
+        CANON["near_term_status"], CANON["long_term_status"], CANON["net_zero_status"],
+        CANON["target_year"], CANON["net_zero_year"], CANON["target_class_long"],
+        CANON["removal_reason"], "Composite Score", "RAG",
     ]
     show_cols = [c for c in show_cols if c in off.columns]
     st.dataframe(off[show_cols], use_container_width=True, height=600, hide_index=True)
@@ -281,16 +282,21 @@ with tab_company:
 
     st.markdown("**Targets**")
     target_cols = {
-        "Action": rec.get(CANON["action"]),
-        "Status": rec.get(CANON["status"]),
         "Near-term status": rec.get(CANON["near_term_status"]),
-        "Classification": rec.get(CANON["target_class"]),
+        "Long-term status": rec.get(CANON["long_term_status"]),
+        "Net-Zero status": rec.get(CANON["net_zero_status"]),
+        "Classification (short)": rec.get(CANON["target_class"]),
+        "Classification (long)": rec.get(CANON["target_class_long"]),
         "Ambition": rec.get(CANON["ambition"]),
         "Base year": rec.get(CANON["base_year"]),
-        "Target year": rec.get(CANON["target_year"]),
+        "Near-term target year": rec.get(CANON["target_year"]),
+        "Long-term target year": rec.get(CANON["long_term_target_year"]),
         "Net-Zero year": rec.get(CANON["net_zero_year"]),
+        "BA1.5 status": rec.get(CANON["ba15_status"]),
+        "BA1.5 date": rec.get(CANON["ba15_date"]),
         "Date committed": rec.get(CANON["date_committed"]),
-        "Date published": rec.get(CANON["date_published"]),
+        "Date updated": rec.get(CANON["date_updated"]),
+        "Removal/Extension reason": rec.get(CANON["removal_reason"]),
     }
     st.table(pd.DataFrame(target_cols.items(), columns=["Field", "Value"]))
 
