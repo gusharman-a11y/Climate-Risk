@@ -27,6 +27,12 @@ from modules.phase2 import (
     save_cache,
     upsert_record,
 )
+from modules.scraper import (
+    fetch_and_parse,
+    fetch_pdf,
+    parse_emissions,
+    search_report_url,
+)
 
 st.set_page_config(
     page_title="ASX SBTi Target Screen — Phase 1",
@@ -418,18 +424,99 @@ with tab_company:
         else:
             st.caption("No reported emissions on file. Add via the form below or via CSV upload in the sidebar.")
 
-        # Manual entry form
-        with st.expander("➕ Add or update reported emissions"):
+        # ── Three-layer ingestion: PDF upload, paste URL, auto-search ──
+        st.markdown("#### Ingest sustainability report")
+        ing_tab1, ing_tab2, ing_tab3 = st.tabs([
+            "📄 Upload PDF (most reliable)", "🔗 Paste URL", "🔎 Auto-search"
+        ])
+
+        parsed_seed: dict | None = None
+        seed_source = ""
+        seed_url = ""
+
+        with ing_tab1:
+            st.caption("Upload the latest sustainability report PDF. Parses locally — no network calls.")
+            pdf_up = st.file_uploader("PDF", type=["pdf"], key=f"pdf_up_{isin_key}")
+            if pdf_up is not None and st.button("Parse PDF", key=f"parse_pdf_{isin_key}"):
+                with st.spinner("Parsing…"):
+                    parsed_seed = parse_emissions(pdf_up.getvalue())
+                seed_source = "pdf-upload"
+
+        with ing_tab2:
+            st.caption("Paste the direct PDF URL of the latest sustainability report.")
+            url_input = st.text_input("Report PDF URL", key=f"url_in_{isin_key}")
+            if url_input and st.button("Fetch + parse", key=f"fetch_url_{isin_key}"):
+                with st.spinner(f"Fetching {url_input}…"):
+                    try:
+                        parsed_seed = fetch_and_parse(url_input)
+                        seed_source = "url-paste"
+                        seed_url = url_input
+                    except Exception as exc:
+                        st.error(f"Fetch failed: {exc}")
+
+        with ing_tab3:
+            st.caption(
+                "Search the web for the company's latest sustainability report PDF. "
+                "Best-effort — corporate sites sometimes block automated access. "
+                "If this fails, use Upload PDF or Paste URL."
+            )
+            year_hint = st.number_input("Year hint (optional)", min_value=2018, max_value=2030,
+                                         value=2024, step=1, key=f"yh_{isin_key}")
+            if st.button("Search", key=f"search_{isin_key}"):
+                with st.spinner("Searching…"):
+                    try:
+                        urls = search_report_url(company, int(year_hint))
+                    except Exception as exc:
+                        urls = []
+                        st.error(f"Search failed: {exc}")
+                if urls:
+                    st.success(f"Found {len(urls)} candidate URLs.")
+                    chosen = st.radio("Pick one to fetch", urls, key=f"pick_{isin_key}")
+                    if st.button("Fetch + parse selected", key=f"fp_{isin_key}"):
+                        with st.spinner(f"Fetching {chosen}…"):
+                            try:
+                                parsed_seed = fetch_and_parse(chosen)
+                                seed_source = "auto-search"
+                                seed_url = chosen
+                            except Exception as exc:
+                                st.error(f"Fetch failed: {exc}")
+                elif urls is not None:
+                    st.warning("No PDF candidates found. Try a different year hint or use Paste URL.")
+
+        if parsed_seed and "error" not in parsed_seed:
+            st.success(
+                f"Parsed {parsed_seed.get('pages_read', 0)} pages. "
+                f"Detected: year={parsed_seed.get('reporting_year')}, "
+                f"S1={parsed_seed.get('s1')}, S2={parsed_seed.get('s2')}, S3={parsed_seed.get('s3')}. "
+                f"Review and save below."
+            )
+            if parsed_seed.get("snippets"):
+                with st.expander("Show source snippets"):
+                    for k, snip in parsed_seed["snippets"].items():
+                        st.code(f"{k}: {snip}", language=None)
+
+        # Manual entry form (always available, optionally pre-filled by parser)
+        with st.expander("➕ Add or update reported emissions", expanded=parsed_seed is not None):
+            seeded_year = (parsed_seed or {}).get("reporting_year") or 2024
+            seeded_s1 = float((parsed_seed or {}).get("s1") or 0)
+            seeded_s2 = float((parsed_seed or {}).get("s2") or 0)
+            seeded_s3 = float((parsed_seed or {}).get("s3") or 0)
+            seeded_url = seed_url or ((parsed_seed or {}).get("source_url") or "")
             with st.form(f"emissions_form_{isin_key}"):
                 colA, colB, colC = st.columns(3)
-                rep_year = colA.number_input("Reporting year", min_value=2000, max_value=2035, value=2024, step=1)
-                s1 = colB.number_input("Scope 1 (tCO2e)", min_value=0.0, value=0.0, step=1000.0, format="%.0f")
-                s2 = colC.number_input("Scope 2 (tCO2e)", min_value=0.0, value=0.0, step=1000.0, format="%.0f")
+                rep_year = colA.number_input("Reporting year", min_value=2000, max_value=2035,
+                                             value=int(seeded_year), step=1)
+                s1 = colB.number_input("Scope 1 (tCO2e)", min_value=0.0, value=seeded_s1, step=1000.0, format="%.0f")
+                s2 = colC.number_input("Scope 2 (tCO2e)", min_value=0.0, value=seeded_s2, step=1000.0, format="%.0f")
                 colD, colE, colF = st.columns(3)
-                s3 = colD.number_input("Scope 3 (tCO2e, optional)", min_value=0.0, value=0.0, step=1000.0, format="%.0f")
+                s3 = colD.number_input("Scope 3 (tCO2e, optional)", min_value=0.0, value=seeded_s3, step=1000.0, format="%.0f")
                 base_year_in = colE.number_input("Base year", min_value=2000, max_value=2030, value=2019, step=1)
                 base_s12_in = colF.number_input("Base year S1+S2 (tCO2e)", min_value=0.0, value=0.0, step=1000.0, format="%.0f")
-                source_url = st.text_input("Source URL (sustainability report link)", value="")
+                source_url = st.text_input("Source URL (sustainability report link)", value=seeded_url)
+                source_kind = st.selectbox(
+                    "Data source", ["manual", "pdf-upload", "url-paste", "auto-search"],
+                    index={"manual": 0, "pdf-upload": 1, "url-paste": 2, "auto-search": 3}.get(seed_source or "manual", 0),
+                )
                 submitted = st.form_submit_button("Save")
                 if submitted:
                     upsert_record(
@@ -438,7 +525,7 @@ with tab_company:
                         s1=s1 or None, s2=s2 or None, s3=s3 or None,
                         base_year=int(base_year_in) if base_year_in else None,
                         base_s12=base_s12_in or None,
-                        source="manual",
+                        source=source_kind,
                         source_url=source_url,
                     )
                     save_cache(emissions_cache)
