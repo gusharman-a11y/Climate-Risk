@@ -38,6 +38,36 @@ from modules.scraper import (
 )
 from modules.tpi import MQ_COLOUR, CP_COLOUR, attach_tpi
 
+
+def _column_config():
+    """Centralised column display rules: friendly names + integer year format."""
+    yr = st.column_config.NumberColumn(format="%d")
+    return {
+        "MQ Level": st.column_config.TextColumn(
+            "Climate maturity",
+            help="TPI Management Quality (0–4*). 0 unaware → 4* aligned strategic. "
+                 "Synthesised from SBTi disclosures.",
+        ),
+        "CP Alignment": st.column_config.TextColumn(
+            "Carbon Performance",
+            help="TPI alignment label: 1.5°C / Below 2°C / 2°C / Not aligned / Insufficient.",
+        ),
+        "Target Year (used)": st.column_config.NumberColumn("Target Year", format="%d"),
+        "Years to Target": st.column_config.NumberColumn("Yrs to target", format="%d"),
+        "Latest Reported Year": yr,
+        "Target Year": yr,
+        "Net-Zero Year": yr,
+        "Long-term Target Year": yr,
+        "Base Year": yr,
+        "Required Reduction % (now)": st.column_config.NumberColumn(
+            "Required reduction now", format="%.1f %%"),
+        "Actual Reduction % (now)": st.column_config.NumberColumn(
+            "Actual reduction now", format="%.1f %%"),
+        "Gap to Path (pp)": st.column_config.NumberColumn(
+            "Gap to path", format="%+.1f pp"),
+    }
+
+
 st.set_page_config(
     page_title="ASX SBTi BD tracker",
     page_icon="🇦🇺",
@@ -192,7 +222,7 @@ with st.sidebar.expander("More filters", expanded=False):
         min_value=-10, max_value=30, value=(-10, 30), step=1,
         help="Negative = target year already passed.",
     )
-    f_mq = st.multiselect("MQ Level", ["0", "1", "2", "3", "4", "4*"])
+    f_mq = st.multiselect("Climate maturity (TPI MQ Level)", ["0", "1", "2", "3", "4", "4*"])
     f_cp = st.multiselect(
         "CP Alignment",
         ["Aligned 1.5°C", "Aligned Below 2°C", "Aligned 2°C / NDC",
@@ -263,7 +293,8 @@ with tab_screen:
         ]
 
     styler = table.style.apply(_row_style, axis=1)
-    st.dataframe(styler, use_container_width=True, height=620, hide_index=True)
+    st.dataframe(styler, use_container_width=True, height=620, hide_index=True,
+                 column_config=_column_config())
 
     st.download_button(
         "Download Phase 1 screen (CSV)",
@@ -281,14 +312,16 @@ with tab_screen:
               "Applicable SBTi Guidance"]]
             .sort_values("Years to Target")
         )
-        st.dataframe(bd1_df, use_container_width=True, height=280, hide_index=True)
+        st.dataframe(bd1_df, use_container_width=True, height=280, hide_index=True,
+                     column_config=_column_config())
     with bd2:
         st.markdown("**Outreach list — V2 will force a target reset**")
         bd2_df = (
             filtered[filtered["V2 Reset Likely"] == "Yes"]
             [[CANON["company"], CANON["sector"], "V2 Reset Reasons"]]
         )
-        st.dataframe(bd2_df, use_container_width=True, height=280, hide_index=True)
+        st.dataframe(bd2_df, use_container_width=True, height=280, hide_index=True,
+                     column_config=_column_config())
 
 
 with tab_delivery:
@@ -340,7 +373,8 @@ with tab_delivery:
         ]
 
     st.dataframe(table.style.apply(_delivery_style, axis=1),
-                 use_container_width=True, height=520, hide_index=True)
+                 use_container_width=True, height=520, hide_index=True,
+                 column_config=_column_config())
     st.download_button(
         "Download delivery table (CSV)",
         table.to_csv(index=False).encode("utf-8"),
@@ -405,7 +439,7 @@ with tab_company:
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Sector", str(rec.get(CANON["sector"], "—")))
-        col2.metric("Target year (used)",
+        col2.metric("Target year",
                     "—" if pd.isna(rec["Target Year (used)"]) else int(rec["Target Year (used)"]))
         col3.metric(
             "Years to target",
@@ -446,7 +480,7 @@ with tab_company:
             mq = rec.get("MQ Level", "0")
             mq_colour = MQ_COLOUR.get(mq, "#6B7280") if isinstance(mq, str) else MQ_COLOUR.get(int(mq) if str(mq).isdigit() else 0, "#6B7280")
             st.markdown(
-                f"**Management Quality (TPI-style):** "
+                f"**Climate maturity (TPI Management Quality):** "
                 f"<span style='color:{mq_colour}; font-weight:700'>"
                 f"{rec.get('MQ Description', '—')}</span>",
                 unsafe_allow_html=True,
@@ -455,7 +489,7 @@ with tab_company:
             cp = rec.get("CP Alignment", "—")
             cp_colour = CP_COLOUR.get(cp, "#6B7280")
             st.markdown(
-                f"**Carbon Performance (TPI-style):** "
+                f"**Carbon Performance alignment (TPI):** "
                 f"<span style='color:{cp_colour}; font-weight:700'>{cp}</span>",
                 unsafe_allow_html=True,
             )

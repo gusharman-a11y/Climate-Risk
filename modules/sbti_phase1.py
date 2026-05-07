@@ -337,8 +337,9 @@ def build_screen(df: pd.DataFrame, cohort: str = "ASX listed") -> pd.DataFrame:
 # so we presume scope coverage was deemed adequate at validation time. The
 # scope analysis still runs internally and feeds the V2 Reset flag.
 
+# Note: ISIN intentionally omitted from default display — not useful for BD work.
 DISPLAY_COLS = [
-    CANON["company"], CANON["isin"], CANON["sector"],
+    CANON["company"], CANON["sector"],
     "Applicable SBTi Guidance",
     "MQ Level", "CP Alignment",
     CANON["near_term_status"], "Target Year (used)", "Year Source", "Years to Target",
