@@ -173,3 +173,66 @@ def fetch_and_parse(url: str) -> dict:
     out = parse_emissions(pdf)
     out["source_url"] = url
     return out
+
+
+# ─── Stored URL registry (data/report_urls.csv) ──────────────────────────────
+
+from pathlib import Path
+
+_URLS_CSV = Path(__file__).resolve().parent.parent / "data" / "report_urls.csv"
+
+
+def _norm(name: str) -> str:
+    return re.sub(r"\s+", " ", str(name or "")).strip().lower()
+
+
+def load_stored_urls():
+    """Read data/report_urls.csv. Returns a list of dicts with keys
+    'company', 'name_norm', 'report', 'period', 'url', 'notes'.
+    Returns [] if the file is missing or unreadable."""
+    if not _URLS_CSV.exists():
+        return []
+    try:
+        import pandas as pd
+        df = pd.read_csv(_URLS_CSV)
+        df.columns = [c.strip() for c in df.columns]
+    except Exception:
+        return []
+    rows = []
+    for _, r in df.iterrows():
+        company = str(r.get("SBTi Company Name", "")).strip()
+        if not company:
+            continue
+        rows.append({
+            "company": company,
+            "name_norm": _norm(company),
+            "report": str(r.get("Report Name", "")).strip(),
+            "period": str(r.get("Reporting Period", "")).strip(),
+            "url": str(r.get("URL", "")).strip(),
+            "notes": str(r.get("Notes", "") or "").strip(),
+        })
+    return rows
+
+
+def lookup_stored_url(company: str, isin: str | None = None,
+                     stored: list | None = None) -> dict | None:
+    """Find a stored URL entry matching the company. Tries exact name match
+    first, then case-insensitive prefix/contains match."""
+    stored = stored if stored is not None else load_stored_urls()
+    target = _norm(company)
+    if not target:
+        return None
+    # Exact normalised match
+    for rec in stored:
+        if rec["name_norm"] == target:
+            return rec
+    # Substring match either way
+    for rec in stored:
+        if target in rec["name_norm"] or rec["name_norm"] in target:
+            return rec
+    # Token-overlap match — strip "limited"/"group"/"corporation" and compare first word
+    target_root = target.split()[0] if target else ""
+    for rec in stored:
+        if target_root and target_root == rec["name_norm"].split()[0]:
+            return rec
+    return None

@@ -31,6 +31,8 @@ from modules.phase2 import (
 from modules.scraper import (
     fetch_and_parse,
     fetch_pdf,
+    load_stored_urls,
+    lookup_stored_url,
     parse_emissions,
     search_report_url,
 )
@@ -124,6 +126,48 @@ with st.sidebar.expander("📊 Reported emissions", expanded=False):
         file_name="emissions_template.csv",
         mime="text/csv",
     )
+
+stored_urls = load_stored_urls()
+if stored_urls:
+    with st.sidebar.expander(f"🌐 Stored report URLs ({len(stored_urls)})", expanded=False):
+        st.caption(
+            "Curated sustainability-report PDF URLs for the cohort. "
+            "Click 'Fetch all' to download + parse each report and populate "
+            "the emissions cache. Runs on this server's network."
+        )
+        if st.button("⚡ Fetch + parse all stored reports"):
+            progress = st.progress(0.0)
+            log_box = st.empty()
+            successes, failures = [], []
+            n = len(stored_urls)
+            for i, rec in enumerate(stored_urls, start=1):
+                progress.progress(i / n, text=f"{i}/{n} {rec['company']}")
+                try:
+                    parsed = fetch_and_parse(rec["url"])
+                    if "error" in parsed:
+                        failures.append((rec["company"], parsed["error"]))
+                        continue
+                    if not parsed.get("reporting_year"):
+                        failures.append((rec["company"], "no reporting year detected"))
+                        continue
+                    upsert_record(
+                        emissions_cache,
+                        company=rec["company"], isin=None,
+                        reporting_year=int(parsed["reporting_year"]),
+                        s1=parsed.get("s1"), s2=parsed.get("s2"), s3=parsed.get("s3"),
+                        source="auto-fetched",
+                        source_url=rec["url"],
+                    )
+                    successes.append(rec["company"])
+                except Exception as exc:
+                    failures.append((rec["company"], str(exc)[:120]))
+            save_cache(emissions_cache)
+            log_box.success(f"Fetched: {len(successes)} / {n}. Reload the page to refresh the table.")
+            if failures:
+                with log_box.container():
+                    st.error(f"Failed: {len(failures)}")
+                    for c, e in failures:
+                        st.caption(f"• {c}: {e}")
 
 screen = build_delivery(screen, emissions_cache)
 screen = attach_tpi(screen)
@@ -478,6 +522,18 @@ with tab_company:
         else:
             st.caption("No reported emissions on file. Add via the form below or via CSV upload in the sidebar.")
 
+        # ── Stored URL one-click fetch (if available) ──
+        stored_url_rec = lookup_stored_url(company, isin_key, stored_urls)
+        if stored_url_rec and stored_url_rec.get("url"):
+            with st.container():
+                st.info(
+                    f"📎 **Curated report on file:** "
+                    f"{stored_url_rec.get('report', 'Sustainability Report')} "
+                    f"({stored_url_rec.get('period', '')})  \n"
+                    f"[{stored_url_rec['url']}]({stored_url_rec['url']})"
+                    + (f"  \n*Note:* {stored_url_rec['notes']}" if stored_url_rec.get("notes") else "")
+                )
+
         # ── Three-layer ingestion: PDF upload, paste URL, auto-search ──
         st.markdown("#### Ingest sustainability report")
         ing_tab1, ing_tab2, ing_tab3 = st.tabs([
@@ -486,7 +542,7 @@ with tab_company:
 
         parsed_seed: dict | None = None
         seed_source = ""
-        seed_url = ""
+        seed_url = stored_url_rec["url"] if stored_url_rec else ""
 
         with ing_tab1:
             st.caption("Upload the latest sustainability report PDF. Parses locally — no network calls.")
@@ -497,8 +553,15 @@ with tab_company:
                 seed_source = "pdf-upload"
 
         with ing_tab2:
-            st.caption("Paste the direct PDF URL of the latest sustainability report.")
-            url_input = st.text_input("Report PDF URL", key=f"url_in_{isin_key}")
+            st.caption(
+                "Paste the direct PDF URL of the latest sustainability report. "
+                "Pre-filled from the curated registry where available."
+            )
+            url_input = st.text_input(
+                "Report PDF URL",
+                value=stored_url_rec["url"] if stored_url_rec else "",
+                key=f"url_in_{isin_key}",
+            )
             if url_input and st.button("Fetch + parse", key=f"fetch_url_{isin_key}"):
                 with st.spinner(f"Fetching {url_input}…"):
                     try:
