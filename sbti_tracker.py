@@ -13,6 +13,7 @@ import streamlit as st
 
 from modules.sbti import CANON, DATA_DIR, load_sbti
 from modules.sbti_phase1 import (
+    COHORTS,
     DISPLAY_COLS,
     SECTOR_RULES,
     V2_COLOUR,
@@ -89,7 +90,20 @@ if sbti_df.empty:
     )
     st.stop()
 
-screen = build_screen(sbti_df)
+st.sidebar.markdown("### Cohort")
+cohort_choice = st.sidebar.radio(
+    "Universe",
+    list(COHORTS.keys()),
+    index=0,
+    help=(
+        "**ASX listed** — Australian SBTi entries with an AU ISIN, plus a hand-curated "
+        "allow-list of dual-listed/missing-ISIN ASX entities (Xero, MoneyMe, Pro-Pac).\n\n"
+        "**Australian Corporate / FI (private)** — Australian SBTi entries that are "
+        "Corporate or Financial Institution org-type but not in the ASX cohort. "
+        "Excludes SMEs."
+    ),
+)
+screen = build_screen(sbti_df, cohort=cohort_choice)
 
 # ─── Phase 2 emissions data ingestion ────────────────────────────────────────
 emissions_cache = load_cache()
@@ -146,9 +160,9 @@ if search:
 
 
 # ─── Main: header + KPIs ───────────────────────────────────────────────────────
-st.title("🇦🇺 ASX SBTi Target Screen — Phase 1")
+st.title(f"🇦🇺 Australian SBTi Target Screen — {cohort_choice}")
 st.caption(
-    "ASX-listed cohort (Australia + AU ISIN) from the SBTi public dataset. "
+    f"Cohort: **{cohort_choice}**. "
     "Targets validated by SBTi are presumed scope-adequate at validation time, so "
     "we don't surface a separate scope-adequacy RAG. The V2 reset flag captures "
     "targets that will need to change: target year ≤2030 (V2 near-term horizon), "

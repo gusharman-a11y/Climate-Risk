@@ -271,27 +271,63 @@ def best_target_year(row: pd.Series) -> tuple[int | None, str]:
 
 # ─── ASX cohort filter & screen builder ───────────────────────────────────────
 
+# ASX-listed Australian companies whose SBTi records carry no AU ISIN
+# (data-quality miss in the SBTi dataset). Hand-curated.
+ASX_ALLOWLIST = {
+    "Xero",                          # NZ ISIN, but ASX:XRO dual-listed
+    "MoneyMe Limited",               # ASX:MME
+    "Pro-Pac Packaging Limited",     # ASX:PPG
+    "Pro-Pac Packaging",
+}
+
+
 def filter_asx(df: pd.DataFrame) -> pd.DataFrame:
-    """ASX-listed cohort: Australian SBTi entries with an AU ISIN."""
+    """ASX-listed cohort: Australian SBTi entries with an AU ISIN, plus a
+    hand-curated allow-list of dual-listed/missing-ISIN ASX entities."""
     if df.empty:
         return df
     country = df[CANON["country"]].astype(str).str.strip().str.lower()
     isin = df[CANON["isin"]].astype(str).str.strip().str.upper()
-    mask = country.eq("australia") & isin.str.startswith("AU")
-    return df[mask].copy()
+    company = df[CANON["company"]].astype(str).str.strip()
+    mask_isin = country.eq("australia") & isin.str.startswith("AU")
+    mask_allow = country.eq("australia") & company.isin(ASX_ALLOWLIST)
+    return df[mask_isin | mask_allow].copy()
 
 
-def build_screen(df: pd.DataFrame) -> pd.DataFrame:
-    """Phase 1 output: full ASX SBTi cohort with adequacy + V2 reset columns,
+def filter_au_private(df: pd.DataFrame) -> pd.DataFrame:
+    """Other Australian large-corporate / financial-institution SBTi entries —
+    everything that's Australian and Corporate/FI but not in the ASX cohort.
+    Excludes SMEs."""
+    if df.empty:
+        return df
+    country = df[CANON["country"]].astype(str).str.strip().str.lower()
+    isin = df[CANON["isin"]].astype(str).str.strip().str.upper()
+    company = df[CANON["company"]].astype(str).str.strip()
+    org = df[CANON["org_type"]].astype(str).str.strip().str.lower()
+    in_asx = country.eq("australia") & (isin.str.startswith("AU") | company.isin(ASX_ALLOWLIST))
+    is_au = country.eq("australia")
+    is_large = org.isin({"corporate", "financial institution"})
+    return df[is_au & ~in_asx & is_large].copy()
+
+
+COHORTS = {
+    "ASX listed": filter_asx,
+    "Australian Corporate / FI (private)": filter_au_private,
+}
+
+
+def build_screen(df: pd.DataFrame, cohort: str = "ASX listed") -> pd.DataFrame:
+    """Phase 1 output: cohort + adequacy + V2 reset columns,
     sorted by Years to Target ascending (NaN last).
     """
     if df.empty:
         return df
-    asx = filter_asx(df)
-    if asx.empty:
-        return asx
-    extra = asx.apply(assess_row, axis=1, result_type="expand")
-    out = pd.concat([asx.reset_index(drop=True), extra.reset_index(drop=True)], axis=1)
+    fn = COHORTS.get(cohort, filter_asx)
+    sub = fn(df)
+    if sub.empty:
+        return sub
+    extra = sub.apply(assess_row, axis=1, result_type="expand")
+    out = pd.concat([sub.reset_index(drop=True), extra.reset_index(drop=True)], axis=1)
     out = out.sort_values("Years to Target", ascending=True, na_position="last").reset_index(drop=True)
     return out
 
