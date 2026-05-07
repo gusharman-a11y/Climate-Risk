@@ -311,18 +311,38 @@ def filter_au_private(df: pd.DataFrame) -> pd.DataFrame:
 
 
 COHORTS = {
-    "ASX listed": filter_asx,
-    "Australian Corporate / FI (private)": filter_au_private,
+    "ASX listed (SBTi)": filter_asx,
+    "Australian Corporate / FI (SBTi, private)": filter_au_private,
+    "ASX 200 — no SBTi target": None,  # Loaded from a separate CSV, not filtered from SBTi data
 }
 
 
-def build_screen(df: pd.DataFrame, cohort: str = "ASX listed") -> pd.DataFrame:
+def build_screen(df: pd.DataFrame, cohort: str = "ASX listed (SBTi)") -> pd.DataFrame:
     """Phase 1 output: cohort + adequacy + V2 reset columns,
     sorted by Years to Target ascending (NaN last).
+
+    For the 'ASX 200 — no SBTi target' cohort, df is ignored and data is
+    loaded from data/asx200_non_sbti.csv via modules.asx200.
     """
+    if cohort == "ASX 200 — no SBTi target":
+        from modules.asx200 import load_asx200, to_phase1_shape
+        sub = to_phase1_shape(load_asx200())
+        if sub.empty:
+            return sub
+        # Run assess_row anyway — most outputs will be N/A for non-SBTi rows,
+        # but the column structure stays consistent with the SBTi cohorts.
+        extra = sub.apply(assess_row, axis=1, result_type="expand")
+        out = pd.concat([sub.reset_index(drop=True), extra.reset_index(drop=True)], axis=1)
+        # Sort by BD priority descending (highest = no public target = strongest signal)
+        if "BD Priority" in out.columns:
+            out = out.sort_values("BD Priority", ascending=False).reset_index(drop=True)
+        return out
+
     if df.empty:
         return df
-    fn = COHORTS.get(cohort, filter_asx)
+    fn = COHORTS.get(cohort)
+    if fn is None:
+        return df.iloc[:0]
     sub = fn(df)
     if sub.empty:
         return sub

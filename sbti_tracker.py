@@ -59,12 +59,29 @@ def _column_config():
         "Net-Zero Year": yr,
         "Long-term Target Year": yr,
         "Base Year": yr,
+        "Ambition % (parsed)": st.column_config.NumberColumn(
+            "Committed reduction %",
+            format="%.0f %%",
+            help="The % reduction the company committed to in its SBTi target — "
+                 "e.g. '50% by 2030 from a 2019 base year' → 50%. Parsed from the "
+                 "full target wording.",
+        ),
         "Required Reduction % (now)": st.column_config.NumberColumn(
-            "Required reduction now", format="%.1f %%"),
+            "Required reduction now",
+            format="%.1f %%",
+            help="What % reduction the company should have achieved by the latest "
+                 "reporting year, on a straight-line path from base year to target year.",
+        ),
         "Actual Reduction % (now)": st.column_config.NumberColumn(
-            "Actual reduction now", format="%.1f %%"),
+            "Actual reduction now",
+            format="%.1f %%",
+            help="Reduction actually achieved at the latest reporting year, vs the base year.",
+        ),
         "Gap to Path (pp)": st.column_config.NumberColumn(
-            "Gap to path", format="%+.1f pp"),
+            "Gap to path",
+            format="%+.1f pp",
+            help="Actual − Required. Positive = ahead of path. Negative = behind.",
+        ),
     }
 
 
@@ -127,11 +144,14 @@ cohort_choice = st.sidebar.radio(
     list(COHORTS.keys()),
     index=0,
     help=(
-        "**ASX listed** — Australian SBTi companies with an ASX listing.\n\n"
-        "**Australian Corporate / FI (private)** — privately-held large Australian "
-        "Corporate or Financial Institution SBTi entries (excludes SMEs)."
+        "**ASX listed (SBTi)** — Australian SBTi-validated cohort with an ASX listing.\n\n"
+        "**Australian Corporate / FI (SBTi, private)** — privately-held large Aussie "
+        "Corporate or FI SBTi entries (excludes SMEs).\n\n"
+        "**ASX 200 — no SBTi target** — major ASX-listed companies that don't have "
+        "an SBTi-validated target. BD signal: ASRS now, SBTi-style scrutiny soon."
     ),
 )
+is_non_sbti = cohort_choice == "ASX 200 — no SBTi target"
 screen = build_screen(sbti_df, cohort=cohort_choice)
 
 emissions_cache = load_cache()
