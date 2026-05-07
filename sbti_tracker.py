@@ -177,6 +177,23 @@ with st.sidebar.expander("📊 Reported emissions", expanded=False):
         mime="text/csv",
     )
 
+    # Persist whatever's in the runtime cache by downloading + committing.
+    import json as _json
+    cache_payload = _json.dumps(emissions_cache, indent=2, default=str).encode("utf-8")
+    n_companies = len(emissions_cache)
+    n_records = sum(len(rec.get("history", [])) for rec in emissions_cache.values())
+    st.download_button(
+        f"💾 Download emissions cache ({n_companies} companies, {n_records} entries)",
+        cache_payload,
+        file_name="emissions_cache.json",
+        mime="application/json",
+        help=(
+            "After running 'Fetch + parse all stored reports', download this file "
+            "and paste its contents (or upload it) to Claude in chat — Claude commits "
+            "it to the repo so the data persists permanently for the team."
+        ),
+    )
+
 stored_urls = load_stored_urls()
 if stored_urls:
     with st.sidebar.expander(f"🌐 Stored report URLs ({len(stored_urls)})", expanded=False):
