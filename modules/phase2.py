@@ -69,19 +69,27 @@ def parse_target_params(target_text: str | None, near_term_year: int | None = No
     target_year = int(m_tgt.group(1)) if m_tgt else near_term_year
 
     # Near-term ambition % — first percentage near "scope 1" or "scope 1 and 2"
-    # SBTi targets are typically phrased as "reduce absolute scope 1 and 2 GHG emissions X%"
+    # SBTi targets are typically phrased "reduce absolute scope 1 and 2 GHG emissions X%"
+    # Skip Financial-Institution targets which use coverage-style language ("X% of
+    # investment activities") that shouldn't drive the trajectory math.
     pct: float | None = None
-    m_pct = re.search(
-        r"scope\s*1[^%]{0,60}?(\d{1,3}(?:\.\d+)?)\s*%",
+    is_fi_coverage = re.search(
+        r"\d{1,3}\s*%\s+of\s+(?:its\s+)?(?:total\s+)?(?:investment|lending|portfolio|"
+        r"financial activities|outstanding|loan|asset|invested capital)",
         t, re.I,
     )
-    if m_pct:
-        pct = float(m_pct.group(1))
-    else:
-        # Fallback: first percentage in the text
-        m_any = re.search(r"(\d{1,3}(?:\.\d+)?)\s*%", t)
-        if m_any:
-            pct = float(m_any.group(1))
+    if not is_fi_coverage:
+        m_pct = re.search(
+            r"reduc\w+[^%]{0,80}?scope\s*[12][^%]{0,80}?(\d{1,3}(?:\.\d+)?)\s*%",
+            t, re.I,
+        )
+        if not m_pct:
+            m_pct = re.search(
+                r"scope\s*1[^%]{0,60}?(\d{1,3}(?:\.\d+)?)\s*%\s+(?!of)",
+                t, re.I,
+            )
+        if m_pct:
+            pct = float(m_pct.group(1))
 
     return TargetParams(base_year, target_year, pct, t)
 
@@ -224,10 +232,23 @@ def _num(v) -> float | None:
 
 
 def _int(v) -> int | None:
+    """Coerce to a 4-digit year. Robust to 'FY2025', '2025.0', date strings, NaN."""
+    if v is None:
+        return None
     try:
-        if v is None or pd.isna(v):
+        if pd.isna(v):
             return None
-        return int(float(v))
+    except (TypeError, ValueError):
+        pass
+    s = str(v).strip()
+    if not s or s.lower() == "nan":
+        return None
+    m = re.search(r"(19|20)\d{2}", s)
+    if m:
+        return int(m.group(0))
+    try:
+        i = int(float(s))
+        return i if 1900 < i < 2200 else None
     except (TypeError, ValueError):
         return None
 
