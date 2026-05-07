@@ -179,67 +179,94 @@ def format_scopes(scopes: set[str]) -> str:
 # ─── Adequacy & V2 reset assessment ──────────────────────────────────────────
 
 def assess_row(row: pd.Series) -> dict:
+    """Phase 1 assessment. SBTi-validated targets are presumed scope-adequate
+    at validation time, so we don't surface a Scope Adequacy RAG. Scope analysis
+    feeds only the V2 reset flag."""
     sector = row.get(CANON["sector"])
     rule = applicable_rule(sector)
     target_text = row.get(CANON["target"])
 
     covered = parse_scopes(target_text)
     required = set(rule.required) if rule else set()
-
-    # If required Cat is not present but the bare scope (S1/S2/S3) is, that's still a gap.
     missing = sorted(required - covered)
-    if not rule:
-        adequacy = "N/A"
-        gap_text = "No SBTi sector guidance applies — general corporate criteria (67% Scope 3) only checkable with emissions data."
-    elif not missing:
-        adequacy = "Green"
-        gap_text = "All required scopes per applicable SBTi sector guidance are covered."
-    elif len(missing) == 1:
-        adequacy = "Amber"
-        gap_text = f"Missing: {', '.join(missing)}"
-    else:
-        adequacy = "Red"
-        gap_text = f"Missing: {', '.join(missing)}"
 
-    # ── V2 reset flag ──
-    # Triggers per user definition:
-    #   (a) target year imminent — ≤2 yrs from now
-    #   (b) required scopes missing
-    #   (c) SBTi sector guidance applies but not followed (i.e. there is a rule and there is a gap)
-    target_year = _to_int(row.get(CANON["target_year"]))
+    target_year, year_source = best_target_year(row)
     this_year = datetime.utcnow().year
     yrs_to = (target_year - this_year) if target_year else None
 
+    # ── V2 reset triggers ──
+    # (a) target year ≤ 2030 (the SBTi V2 near-term horizon)
+    # (b) target year already passed
+    # (c) required scopes missing per applicable SBTi sector guidance
     reset_reasons: list[str] = []
-    if yrs_to is not None:
-        if yrs_to < 0:
-            reset_reasons.append(f"Target year passed ({abs(yrs_to)} yr{'s' if abs(yrs_to) != 1 else ''} ago)")
-        elif yrs_to <= 2:
-            reset_reasons.append(f"Target due in {yrs_to} yr{'s' if yrs_to != 1 else ''}")
-    if rule and missing:
+    if target_year is not None:
+        if target_year < this_year:
+            reset_reasons.append(
+                f"Target year passed ({target_year}, {abs(yrs_to)} yr"
+                f"{'s' if abs(yrs_to) != 1 else ''} ago)"
+            )
+        elif target_year <= 2030:
+            reset_reasons.append(
+                f"Target due {target_year} (≤2030 V2 horizon, {yrs_to} yr"
+                f"{'s' if yrs_to != 1 else ''} away)"
+            )
+    # Only consider scope-gap as a V2 reset trigger if a target is actually
+    # validated/set. For "Committed" companies there's no target to evaluate.
+    near_term_status = str(row.get(CANON["near_term_status"], "")).strip().lower()
+    target_is_set = "targets set" in near_term_status or "validated" in near_term_status
+    if rule and missing and target_is_set:
         reset_reasons.append(
-            f"Missing required scopes ({', '.join(missing)}); "
-            f"SBTi {rule.name} pathway applies but target doesn't follow it"
+            f"SBTi {rule.name} pathway applies but target doesn't cover "
+            f"required scope{'s' if len(missing) != 1 else ''}: {', '.join(missing)}"
         )
 
     return {
         "Applicable SBTi Guidance": rule.name if rule else "—",
-        "Required Scopes": format_scopes(set(rule.required)) if rule else "—",
         "Target Scopes Covered": format_scopes(covered),
-        "Scope Gap": gap_text,
-        "Scope Adequacy": adequacy,
         "Years to Target": yrs_to if yrs_to is not None else pd.NA,
+        "Target Year (used)": target_year if target_year is not None else pd.NA,
+        "Year Source": year_source or "—",
         "V2 Reset Likely": "Yes" if reset_reasons else "No",
         "V2 Reset Reasons": "; ".join(reset_reasons) if reset_reasons else "—",
     }
 
 
 def _to_int(v) -> int | None:
+    """Coerce to a 4-digit year. Handles ints, floats, '2030', '2030.0',
+    '2030-12-31', and pandas/numpy NaN."""
+    if v is None:
+        return None
     try:
-        i = int(float(v))
-        return i if i > 1900 else None
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    # Pull a 4-digit year out of any string representation.
+    s = str(v).strip()
+    if not s or s.lower() == "nan":
+        return None
+    m = re.search(r"(19|20)\d{2}", s)
+    if m:
+        return int(m.group(0))
+    try:
+        i = int(float(s))
+        return i if 1900 < i < 2200 else None
     except Exception:
         return None
+
+
+def best_target_year(row: pd.Series) -> tuple[int | None, str]:
+    """Return (year, source). Falls back near-term -> long-term -> net-zero."""
+    nt = _to_int(row.get(CANON["target_year"]))
+    if nt is not None:
+        return nt, "near-term"
+    lt = _to_int(row.get(CANON["long_term_target_year"]))
+    if lt is not None:
+        return lt, "long-term"
+    nz = _to_int(row.get(CANON["net_zero_year"]))
+    if nz is not None:
+        return nz, "net-zero"
+    return None, ""
 
 
 # ─── ASX cohort filter & screen builder ───────────────────────────────────────
@@ -270,12 +297,15 @@ def build_screen(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ─── Display column order ────────────────────────────────────────────────────
+# Scope adequacy is omitted intentionally — SBTi has signed these targets off,
+# so we presume scope coverage was deemed adequate at validation time. The
+# scope analysis still runs internally and feeds the V2 Reset flag.
 
 DISPLAY_COLS = [
     CANON["company"], CANON["isin"], CANON["sector"],
     "Applicable SBTi Guidance",
-    CANON["near_term_status"], CANON["target_year"], "Years to Target",
-    "Target Scopes Covered", "Required Scopes", "Scope Adequacy", "Scope Gap",
+    CANON["near_term_status"], "Target Year (used)", "Year Source", "Years to Target",
+    "Target Scopes Covered",
     "V2 Reset Likely", "V2 Reset Reasons",
     CANON["net_zero_year"], CANON["long_term_status"], CANON["net_zero_status"],
     CANON["target_class_long"], CANON["removal_reason"],
@@ -283,9 +313,7 @@ DISPLAY_COLS = [
 ]
 
 
-ADEQUACY_COLOUR = {
-    "Green": "#16A34A",
-    "Amber": "#D97706",
-    "Red": "#DC2626",
-    "N/A": "#6B7280",
+V2_COLOUR = {
+    "Yes": "#DC2626",
+    "No": "#16A34A",
 }
