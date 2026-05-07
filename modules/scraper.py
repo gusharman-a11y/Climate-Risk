@@ -126,6 +126,102 @@ def fetch_pdf(url: str, timeout: int = 30) -> bytes:
     return r.content
 
 
+def fetch_html(url: str, timeout: int = 30) -> tuple[str, str]:
+    """Fetch an HTML page. Returns (final_url, html_text)."""
+    import requests
+    r = requests.get(url, headers={"User-Agent": DEFAULT_UA}, timeout=timeout, allow_redirects=True)
+    r.raise_for_status()
+    return r.url, r.text
+
+
+# ─── Auto-discover PDF links from an IR landing page ─────────────────────────
+
+# Keywords ranked by likelihood of pointing at the latest sustainability/annual
+# report. Used to score and rank candidate PDF links.
+_KEYWORDS_HIGH = [
+    "sustainability report", "climate report", "esg report", "tcfd report",
+    "impact report", "annual sustainability",
+]
+_KEYWORDS_MED = ["annual report", "corporate report", "integrated report"]
+_KEYWORDS_LOW = ["climate", "sustainability", "esg", "tcfd", "annual", "report"]
+
+
+def _candidate_score(url: str, text: str) -> int:
+    blob = (url + " " + text).lower()
+    score = 0
+    # Recency — current and recent years
+    import datetime
+    yr = datetime.datetime.utcnow().year
+    for delta, weight in ((0, 6), (-1, 4), (-2, 2)):
+        target = str(yr + delta)
+        if target in blob:
+            score += weight
+        # FY24, FY25 abbreviations
+        if f"fy{(yr + delta) % 100}" in blob or f"fy{yr + delta}" in blob:
+            score += weight
+    # Title/topic keywords
+    for kw in _KEYWORDS_HIGH:
+        if kw in blob:
+            score += 5
+    for kw in _KEYWORDS_MED:
+        if kw in blob:
+            score += 3
+    for kw in _KEYWORDS_LOW:
+        if kw in blob:
+            score += 1
+    # Penalise obviously-irrelevant
+    for noise in ("policy", "terms", "cookies", "privacy", "media-release",
+                  "presentation", "investor-presentation", "appendix", "minutes"):
+        if noise in blob:
+            score -= 4
+    return score
+
+
+def discover_pdfs(landing_url: str, max_results: int = 5) -> list[dict]:
+    """Fetch an IR/sustainability landing page; return ranked PDF candidates.
+    Each result: {url, anchor_text, score}. Empty list if no PDFs found."""
+    final_url, html = fetch_html(landing_url)
+    base = urlparse(final_url)
+    base_host = f"{base.scheme}://{base.netloc}"
+
+    # Find <a href="...pdf...">anchor text</a>
+    candidates: dict[str, tuple[str, int]] = {}
+    for m in re.finditer(
+        r'<a\s+[^>]*href\s*=\s*"([^"]+\.(?:pdf|ashx)(?:[?#][^"]*)?)"[^>]*>(.*?)</a>',
+        html, re.I | re.S,
+    ):
+        href = m.group(1).strip()
+        text = re.sub(r"<[^>]+>", " ", m.group(2))
+        text = re.sub(r"\s+", " ", text).strip()
+        # Resolve relative URLs
+        if href.startswith("/"):
+            href = base_host + href
+        elif not href.startswith("http"):
+            href = urljoin(final_url, href)
+        score = _candidate_score(href, text)
+        # Keep highest-scoring entry per URL
+        if href not in candidates or candidates[href][1] < score:
+            candidates[href] = (text, score)
+
+    ranked = sorted(
+        ({"url": u, "anchor_text": t, "score": s} for u, (t, s) in candidates.items()),
+        key=lambda d: d["score"], reverse=True,
+    )
+    return ranked[:max_results]
+
+
+def resolve_url(url: str) -> tuple[str, list[dict]]:
+    """If `url` ends with .pdf/.ashx, return (url, []) — already a direct PDF.
+    Otherwise treat as a landing page; discover candidates and return
+    (best_candidate_url, all_candidates). Raises if no candidates found."""
+    if re.search(r"\.(pdf|ashx)(?:$|[?#])", url, re.I):
+        return url, []
+    candidates = discover_pdfs(url)
+    if not candidates:
+        raise ValueError(f"No PDF candidates found on {url}")
+    return candidates[0]["url"], candidates
+
+
 # ─── Auto-search (best-effort) ───────────────────────────────────────────────
 
 DDG_HTML = "https://html.duckduckgo.com/html/"
@@ -167,11 +263,16 @@ def search_report_url(company: str, year_hint: int | None = None, max_results: i
 
 
 def fetch_and_parse(url: str) -> dict:
-    """One-shot: fetch a PDF URL and parse emissions. Returns the parser dict
-    with the source URL added."""
-    pdf = fetch_pdf(url)
+    """One-shot: fetch a URL and parse emissions. If the URL is a landing
+    page rather than a direct PDF, discover the best candidate and follow
+    that. Returns the parser dict with the resolved source URL."""
+    resolved, candidates = resolve_url(url)
+    pdf = fetch_pdf(resolved)
     out = parse_emissions(pdf)
-    out["source_url"] = url
+    out["source_url"] = resolved
+    out["original_url"] = url
+    if candidates:
+        out["all_candidates"] = candidates
     return out
 
 

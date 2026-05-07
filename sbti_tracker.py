@@ -601,6 +601,10 @@ with tab_company:
                     st.warning("No PDF candidates found. Try a different year hint or use Paste URL.")
 
         if parsed_seed and "error" not in parsed_seed:
+            resolved = parsed_seed.get("source_url", "")
+            original = parsed_seed.get("original_url", "")
+            if original and resolved and resolved != original:
+                st.info(f"Discovered PDF from landing page: [{resolved}]({resolved})")
             st.success(
                 f"Parsed {parsed_seed.get('pages_read', 0)} pages. "
                 f"Detected: year={parsed_seed.get('reporting_year')}, "
@@ -611,6 +615,13 @@ with tab_company:
                 with st.expander("Show source snippets"):
                     for k, snip in parsed_seed["snippets"].items():
                         st.code(f"{k}: {snip}", language=None)
+            if parsed_seed.get("all_candidates"):
+                with st.expander(f"Other PDFs found on landing page ({len(parsed_seed['all_candidates'])-1})"):
+                    for cand in parsed_seed["all_candidates"][1:]:
+                        st.write(
+                            f"• [{cand['anchor_text'] or cand['url']}]({cand['url']}) "
+                            f"(score: {cand['score']})"
+                        )
 
         # Manual entry form (always available, optionally pre-filled by parser)
         with st.expander("➕ Add or update reported emissions", expanded=parsed_seed is not None):
