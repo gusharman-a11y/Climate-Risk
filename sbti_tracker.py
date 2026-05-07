@@ -1,4 +1,4 @@
-"""Phase 1 — ASX SBTi target screen.
+"""ASX SBTi BD tracker — target screen, delivery, TPI-style indicators.
 
 Run: streamlit run sbti_tracker.py
 """
@@ -34,9 +34,10 @@ from modules.scraper import (
     parse_emissions,
     search_report_url,
 )
+from modules.tpi import MQ_COLOUR, CP_COLOUR, attach_tpi
 
 st.set_page_config(
-    page_title="ASX SBTi Target Screen — Phase 1",
+    page_title="ASX SBTi BD tracker",
     page_icon="🇦🇺",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -56,15 +57,15 @@ st.markdown(
 
 
 # ─── Sidebar: data load ────────────────────────────────────────────────────────
-st.sidebar.title("🇦🇺 ASX SBTi Screen")
-st.sidebar.caption("Phase 1 — target adequacy & V2 reset risk")
+st.sidebar.title("🇦🇺 ASX SBTi BD tracker")
+st.sidebar.caption("Target adequacy, V2 reset risk, delivery progress")
 
-st.sidebar.markdown("### Data source")
-sbti_upload = st.sidebar.file_uploader(
-    "SBTi Companies-Taking-Action (CSV/XLSX)",
-    type=["csv", "xlsx", "xls"],
-    help="Download from sciencebasedtargets.org/companies-taking-action",
-)
+with st.sidebar.expander("📁 Data sources", expanded=False):
+    sbti_upload = st.file_uploader(
+        "SBTi Companies-Taking-Action (CSV/XLSX)",
+        type=["csv", "xlsx", "xls"],
+        help="Override the bundled SBTi data with a fresh download.",
+    )
 
 
 @st.cache_data(show_spinner=False)
@@ -82,115 +83,129 @@ sbti_df = _load(
 )
 
 if sbti_df.empty:
-    st.title("🇦🇺 ASX SBTi Target Screen — Phase 1")
+    st.title("🇦🇺 ASX SBTi BD tracker")
     st.warning(
-        f"No SBTi data loaded. Upload the **Companies Taking Action** dataset in the "
-        f"sidebar, or commit it to `{DATA_DIR / 'sbti_companies.xlsx'}` and reload.\n\n"
-        "Source: https://sciencebasedtargets.org/companies-taking-action"
+        f"No SBTi data loaded. Upload the **Companies Taking Action** dataset from "
+        f"the sidebar, or commit it to `{DATA_DIR / 'sbti_companies.xlsx'}`."
     )
     st.stop()
 
-st.sidebar.markdown("### Cohort")
 cohort_choice = st.sidebar.radio(
-    "Universe",
+    "Cohort",
     list(COHORTS.keys()),
     index=0,
     help=(
-        "**ASX listed** — Australian SBTi entries with an AU ISIN, plus a hand-curated "
-        "allow-list of dual-listed/missing-ISIN ASX entities (Xero, MoneyMe, Pro-Pac).\n\n"
-        "**Australian Corporate / FI (private)** — Australian SBTi entries that are "
-        "Corporate or Financial Institution org-type but not in the ASX cohort. "
-        "Excludes SMEs."
+        "**ASX listed** — Australian SBTi companies with an ASX listing.\n\n"
+        "**Australian Corporate / FI (private)** — privately-held large Australian "
+        "Corporate or Financial Institution SBTi entries (excludes SMEs)."
     ),
 )
 screen = build_screen(sbti_df, cohort=cohort_choice)
 
-# ─── Phase 2 emissions data ingestion ────────────────────────────────────────
 emissions_cache = load_cache()
 
-st.sidebar.markdown("### Phase 2 — emissions data")
-emissions_csv = st.sidebar.file_uploader(
-    "Bulk upload emissions CSV",
-    type=["csv"],
-    help="Use the template (download below) for batch ingest of reported emissions.",
-)
-if emissions_csv is not None:
-    try:
-        n = merge_csv(emissions_cache, emissions_csv.getvalue())
-        save_cache(emissions_cache)
-        st.sidebar.success(f"Merged {n} rows into emissions cache.")
-    except Exception as exc:
-        st.sidebar.error(f"CSV merge failed: {exc}")
+with st.sidebar.expander("📊 Reported emissions", expanded=False):
+    emissions_csv = st.file_uploader(
+        "Bulk upload emissions CSV",
+        type=["csv"],
+        help="Use the template below for batch ingest.",
+    )
+    if emissions_csv is not None:
+        try:
+            n = merge_csv(emissions_cache, emissions_csv.getvalue())
+            save_cache(emissions_cache)
+            st.success(f"Merged {n} rows.")
+        except Exception as exc:
+            st.error(f"Merge failed: {exc}")
 
-st.sidebar.download_button(
-    "📥 Download emissions CSV template",
-    csv_template_bytes(),
-    file_name="emissions_template.csv",
-    mime="text/csv",
-)
+    st.download_button(
+        "📥 Download CSV template",
+        csv_template_bytes(),
+        file_name="emissions_template.csv",
+        mime="text/csv",
+    )
 
-# Apply Phase 2 deliverability scoring on top of Phase 1.
 screen = build_delivery(screen, emissions_cache)
+screen = attach_tpi(screen)
 
 
-# ─── Sidebar: filters ──────────────────────────────────────────────────────────
-st.sidebar.markdown("### Filters")
+st.sidebar.markdown("### Filter the cohort")
+search = st.sidebar.text_input("🔍 Search by company name")
+
 sectors = sorted([s for s in screen[CANON["sector"]].dropna().unique() if str(s).strip()])
-
 f_sector = st.sidebar.multiselect("Sector", sectors)
-f_v2 = st.sidebar.radio("V2 reset likely", ["All", "Yes", "No"], index=0)
-f_yrs = st.sidebar.slider(
-    "Years to target (range)",
-    min_value=-10, max_value=30, value=(-10, 15), step=1,
-    help="Negative = target year already passed. Default surfaces companies with targets due ≤15 yrs out.",
+
+f_priority = st.sidebar.radio(
+    "Outreach priority",
+    ["All", "High (target ≤2030 or scope gap)", "Low (target >2030 and on track)"],
+    index=0,
+    help="High = target year ≤2030, target year passed, or required scopes missing.",
 )
-search = st.sidebar.text_input("Search company")
+
+with st.sidebar.expander("More filters", expanded=False):
+    f_yrs = st.slider(
+        "Years to target",
+        min_value=-10, max_value=30, value=(-10, 30), step=1,
+        help="Negative = target year already passed.",
+    )
+    f_mq = st.multiselect("MQ Level", ["0", "1", "2", "3", "4", "4*"])
+    f_cp = st.multiselect(
+        "CP Alignment",
+        ["Aligned 1.5°C", "Aligned Below 2°C", "Aligned 2°C / NDC",
+         "Not aligned", "Insufficient disclosure"],
+    )
+    f_delivery = st.multiselect("Delivery RAG", ["Green", "Amber", "Red", "N/A"])
 
 filtered = screen.copy()
+if search:
+    filtered = filtered[filtered[CANON["company"]].str.contains(search, case=False, na=False)]
 if f_sector:
     filtered = filtered[filtered[CANON["sector"]].isin(f_sector)]
-if f_v2 != "All":
-    filtered = filtered[filtered["V2 Reset Likely"] == f_v2]
+if f_priority == "High (target ≤2030 or scope gap)":
+    filtered = filtered[filtered["V2 Reset Likely"] == "Yes"]
+elif f_priority == "Low (target >2030 and on track)":
+    filtered = filtered[filtered["V2 Reset Likely"] == "No"]
 yrs_lo, yrs_hi = f_yrs
 mask = filtered["Years to Target"].between(yrs_lo, yrs_hi, inclusive="both")
 mask = mask | filtered["Years to Target"].isna()
 filtered = filtered[mask]
-if search:
-    filtered = filtered[filtered[CANON["company"]].str.contains(search, case=False, na=False)]
+if f_mq:
+    filtered = filtered[filtered["MQ Level"].isin(f_mq)]
+if f_cp:
+    filtered = filtered[filtered["CP Alignment"].isin(f_cp)]
+if f_delivery:
+    filtered = filtered[filtered["Delivery RAG"].isin(f_delivery)]
 
 
 # ─── Main: header + KPIs ───────────────────────────────────────────────────────
-st.title(f"🇦🇺 Australian SBTi Target Screen — {cohort_choice}")
+st.title(f"🇦🇺 ASX SBTi BD tracker")
 st.caption(
-    f"Cohort: **{cohort_choice}**. "
-    "Targets validated by SBTi are presumed scope-adequate at validation time, so "
-    "we don't surface a separate scope-adequacy RAG. The V2 reset flag captures "
-    "targets that will need to change: target year ≤2030 (V2 near-term horizon), "
-    "target year already passed, or required scopes missing per applicable SBTi sector guidance."
+    f"**Cohort:** {cohort_choice}. Companies are scored against SBTi sector "
+    "guidance, the SBTi V2 horizon (2030), TPI Management Quality and Carbon "
+    "Performance frameworks, and reported delivery vs committed trajectory."
 )
 
 total = len(filtered)
-target_set = filtered[CANON["near_term_status"]].astype(str).str.lower().str.contains("targets set", na=False).sum()
 due_2030 = int((filtered["Target Year (used)"] <= 2030).fillna(False).sum())
 expired = int((filtered["Years to Target"] < 0).fillna(False).sum())
-v2_yes = int((filtered["V2 Reset Likely"] == "Yes").sum())
-no_year = int(filtered["Years to Target"].isna().sum())
+high_priority = int((filtered["V2 Reset Likely"] == "Yes").sum())
+aligned_15 = int((filtered["CP Alignment"] == "Aligned 1.5°C").sum())
 
 c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("ASX SBTi cohort", f"{total:,}")
+c1.metric("Companies in view", f"{total:,}")
 c2.metric("⏰ Target ≤2030", f"{due_2030:,}")
 c3.metric("⏳ Target year passed", f"{expired:,}")
-c4.metric("⚠️ V2 reset likely", f"{v2_yes:,}")
-c5.metric("ℹ️ No target year", f"{no_year:,}")
+c4.metric("🎯 High outreach priority", f"{high_priority:,}")
+c5.metric("✅ Aligned 1.5°C", f"{aligned_15:,}")
 
 
 tab_screen, tab_delivery, tab_charts, tab_company, tab_rulebook = st.tabs(
-    ["Phase 1 + 2 screen", "Phase 2 — Delivery", "Sector heatmap", "Company drill-down", "Sector rulebook"]
+    ["Cohort", "Delivery", "Sector view", "Company drill-down", "Sector rulebook"]
 )
 
 
 with tab_screen:
-    st.markdown("### Phase 1 cohort — ranked by target proximity")
+    st.markdown("### Cohort — ranked by target proximity")
     st.caption("Sorted by **Years to Target** ascending — most imminent first.")
 
     cols_present = [c for c in DISPLAY_COLS if c in filtered.columns]
@@ -215,7 +230,7 @@ with tab_screen:
 
     bd1, bd2 = st.columns(2)
     with bd1:
-        st.markdown("**BD play 1 — Looming targets (≤2030)**")
+        st.markdown("**Outreach list — looming targets (≤2030)**")
         bd1_df = (
             filtered[filtered["Target Year (used)"] <= 2030]
             [[CANON["company"], CANON["sector"], "Target Year (used)", "Years to Target",
@@ -224,7 +239,7 @@ with tab_screen:
         )
         st.dataframe(bd1_df, use_container_width=True, height=280, hide_index=True)
     with bd2:
-        st.markdown("**BD play 2 — V2 will force a reset**")
+        st.markdown("**Outreach list — V2 will force a target reset**")
         bd2_df = (
             filtered[filtered["V2 Reset Likely"] == "Yes"]
             [[CANON["company"], CANON["sector"], "V2 Reset Reasons"]]
@@ -233,7 +248,7 @@ with tab_screen:
 
 
 with tab_delivery:
-    st.markdown("### Phase 2 — Delivery against committed trajectory")
+    st.markdown("### Delivery against committed trajectory")
     st.caption(
         "Linear-path comparison from each company's own base year to its target year. "
         "Required reduction at the latest reporting year is "
@@ -290,10 +305,9 @@ with tab_delivery:
     )
 
     st.markdown(
-        "**To populate emissions data:** either (a) bulk-upload the CSV template "
-        "from the sidebar, or (b) enter per-company in the **Company drill-down** tab. "
-        "All entries persist to `data/emissions_cache.json` — committing that file "
-        "to the repo makes the data permanent for the team."
+        "**To populate emissions data:** bulk-upload the CSV template from the "
+        "sidebar, or enter per-company in the **Company drill-down** tab "
+        "(supports PDF upload, URL paste, and auto-search)."
     )
 
 
@@ -381,9 +395,35 @@ with tab_company:
         })
         st.table(detail)
 
-        # ── Phase 2: emissions trajectory + manual entry ──
+        # ── TPI-style indicators ──
         st.markdown("---")
-        st.markdown("### Phase 2 — Delivery against committed trajectory")
+        tpi_c1, tpi_c2 = st.columns(2)
+        with tpi_c1:
+            mq = rec.get("MQ Level", "0")
+            mq_colour = MQ_COLOUR.get(mq, "#6B7280") if isinstance(mq, str) else MQ_COLOUR.get(int(mq) if str(mq).isdigit() else 0, "#6B7280")
+            st.markdown(
+                f"**Management Quality (TPI-style):** "
+                f"<span style='color:{mq_colour}; font-weight:700'>"
+                f"{rec.get('MQ Description', '—')}</span>",
+                unsafe_allow_html=True,
+            )
+        with tpi_c2:
+            cp = rec.get("CP Alignment", "—")
+            cp_colour = CP_COLOUR.get(cp, "#6B7280")
+            st.markdown(
+                f"**Carbon Performance (TPI-style):** "
+                f"<span style='color:{cp_colour}; font-weight:700'>{cp}</span>",
+                unsafe_allow_html=True,
+            )
+        st.caption(
+            "MQ and CP indicators are derived from SBTi disclosures using TPI's "
+            "framework structure. They are directional, not authoritative — TPI's "
+            "own published assessments take precedence where available."
+        )
+
+        # ── Delivery against committed trajectory ──
+        st.markdown("---")
+        st.markdown("### Delivery against committed trajectory")
 
         d_col1, d_col2, d_col3, d_col4 = st.columns(4)
         d_col1.metric("Base year", "—" if pd.isna(rec.get("Base Year (used)")) else int(rec["Base Year (used)"]))
@@ -565,8 +605,17 @@ with tab_rulebook:
 
 
 st.sidebar.markdown("---")
-st.sidebar.caption(
-    "**V2 reset triggers:** target year ≤2030 (V2 near-term horizon) OR target year "
-    "already passed OR required scopes missing per applicable SBTi sector guidance.\n\n"
-    "**Target year source:** prefers near-term, falls back to long-term, then net-zero."
-)
+with st.sidebar.expander("ℹ️ Methodology"):
+    st.markdown(
+        "**Outreach priority** = high if target year ≤2030, target year already "
+        "passed, or required Scope 3 categories are missing per applicable SBTi "
+        "sector guidance.\n\n"
+        "**Target year source:** prefers near-term, falls back to long-term, then "
+        "net-zero year.\n\n"
+        "**TPI MQ/CP** (Management Quality / Carbon Performance) levels are "
+        "synthesised from SBTi disclosure data using TPI's framework structure — "
+        "they are directional indicators, not authoritative TPI assessments.\n\n"
+        "**Delivery RAG** compares actual reduction (latest reporting year) "
+        "against the linear-path required reduction implied by each company's "
+        "own committed target."
+    )

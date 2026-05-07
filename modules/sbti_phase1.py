@@ -340,10 +340,10 @@ def build_screen(df: pd.DataFrame, cohort: str = "ASX listed") -> pd.DataFrame:
 DISPLAY_COLS = [
     CANON["company"], CANON["isin"], CANON["sector"],
     "Applicable SBTi Guidance",
+    "MQ Level", "CP Alignment",
     CANON["near_term_status"], "Target Year (used)", "Year Source", "Years to Target",
     "Target Scopes Covered",
     "V2 Reset Likely", "V2 Reset Reasons",
-    # Phase 2 columns (populated by modules.phase2.build_delivery)
     "Latest Reported Year", "Required Reduction % (now)", "Actual Reduction % (now)",
     "Gap to Path (pp)", "Delivery RAG", "Data Source",
     CANON["net_zero_year"], CANON["long_term_status"], CANON["net_zero_status"],
