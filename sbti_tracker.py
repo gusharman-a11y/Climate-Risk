@@ -18,6 +18,15 @@ from modules.sbti_phase1 import (
     V2_COLOUR,
     build_screen,
 )
+from modules.phase2 import (
+    DELIVERY_COLOUR,
+    build_delivery,
+    csv_template_bytes,
+    load_cache,
+    merge_csv,
+    save_cache,
+    upsert_record,
+)
 
 st.set_page_config(
     page_title="ASX SBTi Target Screen — Phase 1",
@@ -76,6 +85,33 @@ if sbti_df.empty:
 
 screen = build_screen(sbti_df)
 
+# ─── Phase 2 emissions data ingestion ────────────────────────────────────────
+emissions_cache = load_cache()
+
+st.sidebar.markdown("### Phase 2 — emissions data")
+emissions_csv = st.sidebar.file_uploader(
+    "Bulk upload emissions CSV",
+    type=["csv"],
+    help="Use the template (download below) for batch ingest of reported emissions.",
+)
+if emissions_csv is not None:
+    try:
+        n = merge_csv(emissions_cache, emissions_csv.getvalue())
+        save_cache(emissions_cache)
+        st.sidebar.success(f"Merged {n} rows into emissions cache.")
+    except Exception as exc:
+        st.sidebar.error(f"CSV merge failed: {exc}")
+
+st.sidebar.download_button(
+    "📥 Download emissions CSV template",
+    csv_template_bytes(),
+    file_name="emissions_template.csv",
+    mime="text/csv",
+)
+
+# Apply Phase 2 deliverability scoring on top of Phase 1.
+screen = build_delivery(screen, emissions_cache)
+
 
 # ─── Sidebar: filters ──────────────────────────────────────────────────────────
 st.sidebar.markdown("### Filters")
@@ -128,8 +164,8 @@ c4.metric("⚠️ V2 reset likely", f"{v2_yes:,}")
 c5.metric("ℹ️ No target year", f"{no_year:,}")
 
 
-tab_screen, tab_charts, tab_company, tab_rulebook = st.tabs(
-    ["Phase 1 screen", "Sector heatmap", "Company drill-down", "Sector rulebook"]
+tab_screen, tab_delivery, tab_charts, tab_company, tab_rulebook = st.tabs(
+    ["Phase 1 + 2 screen", "Phase 2 — Delivery", "Sector heatmap", "Company drill-down", "Sector rulebook"]
 )
 
 
@@ -174,6 +210,71 @@ with tab_screen:
             [[CANON["company"], CANON["sector"], "V2 Reset Reasons"]]
         )
         st.dataframe(bd2_df, use_container_width=True, height=280, hide_index=True)
+
+
+with tab_delivery:
+    st.markdown("### Phase 2 — Delivery against committed trajectory")
+    st.caption(
+        "Linear-path comparison from each company's own base year to its target year. "
+        "Required reduction at the latest reporting year is "
+        "(elapsed yrs / horizon yrs) × ambition %. **Gap-to-path (pp)** = actual − required. "
+        "Positive = ahead of path."
+    )
+
+    has_data = filtered["Latest Reported Year"].notna()
+    coverage = int(has_data.sum())
+    total_in_view = len(filtered)
+    g = int((filtered["Delivery RAG"] == "Green").sum())
+    a = int((filtered["Delivery RAG"] == "Amber").sum())
+    r = int((filtered["Delivery RAG"] == "Red").sum())
+    n = int((filtered["Delivery RAG"] == "N/A").sum())
+
+    cov_pct = (coverage / total_in_view * 100) if total_in_view else 0
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("With reported emissions", f"{coverage:,} / {total_in_view:,}", f"{cov_pct:.0f}% coverage")
+    k2.metric("🟢 On / ahead of path", f"{g:,}")
+    k3.metric("🟡 Behind ≤10pp", f"{a:,}")
+    k4.metric("🔴 Behind >10pp", f"{r:,}")
+    k5.metric("⚪ No data yet", f"{n:,}")
+
+    delivery_cols = [
+        CANON["company"], CANON["sector"], "Applicable SBTi Guidance",
+        "Base Year (used)", "Base S1+S2 (tCO2e)", "Latest Reported Year", "Latest S1+S2 (tCO2e)",
+        "Ambition % (parsed)",
+        "Required Reduction % (now)", "Actual Reduction % (now)",
+        "Gap to Path (pp)", "Delivery RAG", "Data Source",
+    ]
+    delivery_cols = [c for c in delivery_cols if c in filtered.columns]
+    sort_options = ["Gap to Path (pp)", "Years to Target", CANON["company"]]
+    sort_by = st.selectbox("Sort by", sort_options, index=0)
+    ascending = st.checkbox("Ascending (worst gap first)", value=True)
+
+    table = filtered[delivery_cols].copy()
+    if sort_by in table.columns:
+        table = table.sort_values(sort_by, ascending=ascending, na_position="last")
+
+    def _delivery_style(row):
+        c = DELIVERY_COLOUR.get(row.get("Delivery RAG"), "#FFFFFF")
+        return [
+            f"background-color: {c}22; color: {c}; font-weight: 600"
+            if col == "Delivery RAG" else "" for col in row.index
+        ]
+
+    st.dataframe(table.style.apply(_delivery_style, axis=1),
+                 use_container_width=True, height=520, hide_index=True)
+    st.download_button(
+        "Download delivery table (CSV)",
+        table.to_csv(index=False).encode("utf-8"),
+        file_name="asx_sbti_phase2_delivery.csv",
+        mime="text/csv",
+    )
+
+    st.markdown(
+        "**To populate emissions data:** either (a) bulk-upload the CSV template "
+        "from the sidebar, or (b) enter per-company in the **Company drill-down** tab. "
+        "All entries persist to `data/emissions_cache.json` — committing that file "
+        "to the repo makes the data permanent for the team."
+    )
 
 
 with tab_charts:
@@ -259,6 +360,89 @@ with tab_company:
             ],
         })
         st.table(detail)
+
+        # ── Phase 2: emissions trajectory + manual entry ──
+        st.markdown("---")
+        st.markdown("### Phase 2 — Delivery against committed trajectory")
+
+        d_col1, d_col2, d_col3, d_col4 = st.columns(4)
+        d_col1.metric("Base year", "—" if pd.isna(rec.get("Base Year (used)")) else int(rec["Base Year (used)"]))
+        d_col2.metric("Latest year", "—" if pd.isna(rec.get("Latest Reported Year")) else int(rec["Latest Reported Year"]))
+        d_col3.metric(
+            "Required reduction now",
+            "—" if pd.isna(rec.get("Required Reduction % (now)")) else f"{rec['Required Reduction % (now)']}%",
+        )
+        gap = rec.get("Gap to Path (pp)")
+        d_col4.metric(
+            "Gap to path",
+            "—" if pd.isna(gap) else f"{gap:+.1f} pp",
+            delta="On/ahead" if (not pd.isna(gap) and gap >= 0) else ("Behind" if not pd.isna(gap) else None),
+            delta_color="normal" if (pd.isna(gap) or gap >= 0) else "inverse",
+        )
+
+        rag = rec.get("Delivery RAG", "N/A")
+        if rag == "Green":
+            st.success(f"Delivery RAG: **Green** — actual reduction is at or above the linear path required by the committed target.")
+        elif rag == "Amber":
+            st.warning(f"Delivery RAG: **Amber** — behind path by {abs(gap):.1f} pp (≤10 pp).")
+        elif rag == "Red":
+            st.error(f"Delivery RAG: **Red** — behind path by {abs(gap):.1f} pp (>10 pp).")
+        else:
+            st.info("Delivery RAG: **N/A** — emissions data not yet entered. Use the form below.")
+
+        # Trajectory chart if we have data
+        isin_key = str(rec.get(CANON["isin"], "")).strip().upper()
+        cache_rec = emissions_cache.get(isin_key) or emissions_cache.get(company)
+        if cache_rec and cache_rec.get("history"):
+            hist_df = pd.DataFrame(cache_rec["history"]).sort_values("year")
+            hist_df["S1+S2"] = hist_df.apply(
+                lambda r: (r.get("s1") or 0) + (r.get("s2") or 0)
+                if (r.get("s1") is not None or r.get("s2") is not None) else None,
+                axis=1,
+            )
+            base_year = cache_rec.get("base_year")
+            base_s12 = cache_rec.get("base_s12")
+            target_year = int(rec["Target Year (used)"]) if pd.notna(rec.get("Target Year (used)")) else None
+            ambition = rec.get("Ambition % (parsed)")
+            chart_data = hist_df[["year", "S1+S2"]].rename(columns={"year": "Year"}).copy()
+            if base_year and base_s12 and target_year and ambition is not None and not pd.isna(ambition):
+                req_path = pd.DataFrame({
+                    "Year": [base_year, target_year],
+                    "Required path (S1+S2)": [base_s12, base_s12 * (1 - float(ambition) / 100)],
+                })
+                chart_merged = chart_data.merge(req_path, on="Year", how="outer").sort_values("Year")
+            else:
+                chart_merged = chart_data
+            st.markdown("**Emissions trajectory**")
+            st.line_chart(chart_merged.set_index("Year"))
+        else:
+            st.caption("No reported emissions on file. Add via the form below or via CSV upload in the sidebar.")
+
+        # Manual entry form
+        with st.expander("➕ Add or update reported emissions"):
+            with st.form(f"emissions_form_{isin_key}"):
+                colA, colB, colC = st.columns(3)
+                rep_year = colA.number_input("Reporting year", min_value=2000, max_value=2035, value=2024, step=1)
+                s1 = colB.number_input("Scope 1 (tCO2e)", min_value=0.0, value=0.0, step=1000.0, format="%.0f")
+                s2 = colC.number_input("Scope 2 (tCO2e)", min_value=0.0, value=0.0, step=1000.0, format="%.0f")
+                colD, colE, colF = st.columns(3)
+                s3 = colD.number_input("Scope 3 (tCO2e, optional)", min_value=0.0, value=0.0, step=1000.0, format="%.0f")
+                base_year_in = colE.number_input("Base year", min_value=2000, max_value=2030, value=2019, step=1)
+                base_s12_in = colF.number_input("Base year S1+S2 (tCO2e)", min_value=0.0, value=0.0, step=1000.0, format="%.0f")
+                source_url = st.text_input("Source URL (sustainability report link)", value="")
+                submitted = st.form_submit_button("Save")
+                if submitted:
+                    upsert_record(
+                        emissions_cache, company=company, isin=isin_key or None,
+                        reporting_year=int(rep_year),
+                        s1=s1 or None, s2=s2 or None, s3=s3 or None,
+                        base_year=int(base_year_in) if base_year_in else None,
+                        base_s12=base_s12_in or None,
+                        source="manual",
+                        source_url=source_url,
+                    )
+                    save_cache(emissions_cache)
+                    st.success(f"Saved {company} {int(rep_year)} emissions. Reload to refresh the cohort table.")
 
 
 with tab_rulebook:
