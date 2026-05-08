@@ -37,6 +37,7 @@ from modules.scraper import (
     parse_emissions,
     search_report_url,
 )
+from modules.nger import load_nger, inject_to_cache as nger_inject_to_cache
 from modules.tpi import MQ_COLOUR, CP_COLOUR, attach_tpi
 
 
@@ -165,6 +166,49 @@ with st.sidebar.expander("📊 Reported emissions", expanded=False):
         mime="text/csv",
     )
 
+    st.markdown("---")
+    st.markdown("**🇦🇺 NGER bulk import**")
+    st.caption(
+        "Upload the **Corporate emissions and energy data** spreadsheet from "
+        "[cer.gov.au](https://cer.gov.au/markets/reports-and-data/nger-reporting-data-and-registers/). "
+        "Every Aussie company emitting >50 ktCO2e is in there — the gold-standard "
+        "Scope 1 + 2 source for the entire cohort. Released annually around February."
+    )
+    nger_file = st.file_uploader(
+        "NGER spreadsheet (.xlsx / .xls)",
+        type=["xlsx", "xls"],
+        key="nger_upload",
+    )
+    nger_year = st.number_input(
+        "Reporting year (FY end)",
+        min_value=2010, max_value=2035, value=2025, step=1,
+        key="nger_year",
+        help="2025 = FY July 2024–June 2025 (the most recent NGER dataset).",
+    )
+    if nger_file is not None and st.button("Import NGER → emissions cache", key="nger_import"):
+        try:
+            nger_df = load_nger(nger_file.getvalue())
+            cohort_names = list(screen[CANON["company"]].dropna().unique())
+            isin_lookup = dict(zip(screen[CANON["company"]], screen.get(CANON["isin"], "")))
+            ingested, unmatched = nger_inject_to_cache(
+                nger_df, cohort_names, emissions_cache,
+                int(nger_year), isin_lookup,
+            )
+            save_cache(emissions_cache)
+            st.success(
+                f"NGER ingest complete: {ingested} cohort companies matched and updated "
+                f"({len(nger_df)} reporters in NGER file)."
+            )
+            if unmatched:
+                with st.expander(f"⚠️ Unmatched cohort companies ({len(unmatched)})"):
+                    for c in unmatched[:50]:
+                        st.write(f"• {c}")
+                    if len(unmatched) > 50:
+                        st.caption(f"... and {len(unmatched) - 50} more")
+        except Exception as exc:
+            st.error(f"NGER import failed: {exc}")
+
+    st.markdown("---")
     # Persist whatever's in the runtime cache by downloading + committing.
     import json as _json
     cache_payload = _json.dumps(emissions_cache, indent=2, default=str).encode("utf-8")
