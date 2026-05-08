@@ -240,36 +240,69 @@ screen = build_delivery(screen, emissions_cache)
 screen = attach_tpi(screen)
 
 
-st.sidebar.markdown("### Filter the cohort")
-st.sidebar.caption("Default = no filters → all companies show. Active filters appear as chips at the top of the main view.")
-
-search = st.sidebar.text_input("🔍 Search by company name")
-
-sectors = sorted([s for s in screen[CANON["sector"]].dropna().unique() if str(s).strip()])
-f_sector = st.sidebar.multiselect("Sector", sectors)
-
-f_priority = st.sidebar.radio(
-    "Outreach priority",
-    ["All", "High (target ≤2030 or scope gap)", "Low (target >2030 and on track)"],
-    index=0,
-    help="High = target year ≤2030, target year passed, or required scopes missing.",
+# ─── Title (filters render below) ─────────────────────────────────────────────
+st.title(f"🇦🇺 ASX SBTi BD tracker")
+st.caption(
+    f"**Cohort:** {cohort_choice}. Companies are scored against SBTi sector "
+    "guidance, the SBTi V2 horizon (2030), TPI Management Quality and Carbon "
+    "Performance frameworks, and reported delivery vs committed trajectory."
 )
 
-with st.sidebar.expander("More filters", expanded=False):
-    f_yrs = st.slider(
-        "Years to target",
-        min_value=-10, max_value=30, value=(-10, 30), step=1,
-        help="Negative = target year already passed. Default range covers everything.",
-    )
-    f_mq = st.multiselect("Climate maturity (TPI MQ Level)", ["0", "1", "2", "3", "4", "4*"])
-    f_cp = st.multiselect(
-        "CP Alignment",
-        ["Aligned 1.5°C", "Aligned Below 2°C", "Aligned 2°C / NDC",
-         "Not aligned", "Insufficient disclosure"],
-    )
-    f_delivery = st.multiselect("Delivery RAG", ["Green", "Amber", "Red", "N/A"])
+# ─── Top filter bar (horizontal) ──────────────────────────────────────────────
+sectors = sorted([s for s in screen[CANON["sector"]].dropna().unique() if str(s).strip()])
 
-# Track which filters are actually narrowing the view, for chip display
+with st.container(border=True):
+    st.caption("**Filters** — change any to narrow the view; defaults show all companies.")
+    fcol1, fcol2, fcol3, fcol4 = st.columns([2, 2, 2, 1])
+    with fcol1:
+        search = st.text_input("🔍 Search by company name", key="ftr_search")
+    with fcol2:
+        f_sector = st.multiselect("Sector", sectors, key="ftr_sector")
+    with fcol3:
+        f_priority = st.radio(
+            "Outreach priority",
+            ["All", "High (target ≤2030 or scope gap)", "Low (target >2030 and on track)"],
+            index=0, key="ftr_priority",
+            help="High = target year ≤2030, target year passed, or required scopes missing.",
+        )
+    with fcol4:
+        if st.button("↻ Clear filters", use_container_width=True):
+            for k in ("ftr_search", "ftr_sector", "ftr_priority", "ftr_yrs",
+                      "ftr_mq", "ftr_cp", "ftr_delivery"):
+                if k in st.session_state:
+                    del st.session_state[k]
+            st.rerun()
+
+    with st.expander("More filters", expanded=False):
+        gcol1, gcol2, gcol3, gcol4 = st.columns(4)
+        with gcol1:
+            f_yrs = st.slider(
+                "Years to target",
+                min_value=-10, max_value=30, value=(-10, 30), step=1,
+                key="ftr_yrs",
+                help="Negative = target year already passed.",
+            )
+        with gcol2:
+            f_mq = st.multiselect(
+                "Climate maturity (TPI MQ)",
+                ["0", "1", "2", "3", "4", "4*"],
+                key="ftr_mq",
+            )
+        with gcol3:
+            f_cp = st.multiselect(
+                "CP Alignment",
+                ["Aligned 1.5°C", "Aligned Below 2°C", "Aligned 2°C / NDC",
+                 "Not aligned", "Insufficient disclosure"],
+                key="ftr_cp",
+            )
+        with gcol4:
+            f_delivery = st.multiselect(
+                "Delivery RAG",
+                ["Green", "Amber", "Red", "N/A"],
+                key="ftr_delivery",
+            )
+
+# Track active filters for chip display
 active_filters: list[str] = []
 
 filtered = screen.copy()
@@ -303,10 +336,6 @@ if f_delivery:
     filtered = filtered[filtered["Delivery RAG"].isin(f_delivery)]
     active_filters.append(f"Delivery RAG: {', '.join(f_delivery)}")
 
-
-# ─── Main: header + KPIs ───────────────────────────────────────────────────────
-st.title(f"🇦🇺 ASX SBTi BD tracker")
-
 # Active-filter chips + counter
 if active_filters:
     chip_html = " ".join(
@@ -316,20 +345,16 @@ if active_filters:
         for f in active_filters
     )
     st.markdown(
-        f"**Showing {len(filtered)} of {total_in_cohort} companies in cohort**  &nbsp; {chip_html}",
+        f"**Showing {len(filtered)} of {total_in_cohort} companies**  &nbsp; {chip_html}",
         unsafe_allow_html=True,
     )
 else:
     st.markdown(
-        f"**Showing all {total_in_cohort} companies in cohort** — no filters active. "
-        "Use the sidebar to narrow the view."
+        f"**Showing all {total_in_cohort} companies in cohort** — no filters active."
     )
-st.caption(
-    f"**Cohort:** {cohort_choice}. Companies are scored against SBTi sector "
-    "guidance, the SBTi V2 horizon (2030), TPI Management Quality and Carbon "
-    "Performance frameworks, and reported delivery vs committed trajectory."
-)
 
+
+# ─── KPIs ────────────────────────────────────────────────────────────────────
 total = len(filtered)
 due_2030 = int((filtered["Target Year (used)"] <= 2030).fillna(False).sum())
 expired = int((filtered["Years to Target"] < 0).fillna(False).sum())
