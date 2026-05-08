@@ -51,6 +51,17 @@ def _coerce_year(v) -> object:
     return int(m.group(0)) if m else pd.NA
 
 
+def _clean_classification(v) -> str:
+    """ChatGPT sometimes returns 'SBTi committed — submitted intent letter…'.
+    Strip the em-dash/hyphen suffix to keep just the canonical category."""
+    s = str(v or "").strip()
+    for sep in (" — ", " – ", " - "):
+        if sep in s:
+            s = s.split(sep, 1)[0].strip()
+            break
+    return s
+
+
 def apply_overlay(df: pd.DataFrame) -> pd.DataFrame:
     """For each row in df whose Company Name matches a researched entry,
     override Target / Target Year / Net-Zero Year / Target Classification /
@@ -87,7 +98,7 @@ def apply_overlay(df: pd.DataFrame) -> pd.DataFrame:
             work.at[idx, "Target Year"] = ty
         if nz is not pd.NA:
             work.at[idx, "Net-Zero Year"] = nz
-        cls = str(ovl.get("Target Classification", "")).strip()
+        cls = _clean_classification(ovl.get("Target Classification", ""))
         if cls:
             work.at[idx, "Target Classification"] = cls
             work.at[idx, "Target Classification (Long)"] = cls
