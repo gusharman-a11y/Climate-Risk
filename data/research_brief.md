@@ -1,94 +1,88 @@
-# Research request — Climate targets for ASX cohort
+# Climate-target research brief
 
-This is a copy-paste prompt for **Claude.ai chat** (the chat product with web search, distinct from the Claude Code session that built this tracker). The Claude Code session can't fetch the web; Claude.ai can.
+This is the working list for the **external research workflow** (ChatGPT or Claude.ai with web search). The Claude Code session that built this tracker can't fetch the web — that's why we're outsourcing the research.
 
-## Workflow
+## What's already verified — DON'T research these
 
-1. Open https://claude.ai in a new tab
-2. Start a new chat
-3. Paste the **prompt below**
-4. Paste a **batch of company names** from `data/research_backlog.csv` (30–50 at a time works well — long lists may exceed context)
-5. Claude.ai will search the web and return a CSV-formatted block
-6. Copy the CSV output, paste back into this Claude Code chat
-7. I'll merge it into the appropriate enrichment file (`asx200_non_sbti.csv` for cohorts 1–3, `nger_targets.csv` for cohort 4) and commit
+The cohort has 524 companies total. **128 already have credible target data and should be skipped:**
 
----
+- **All SBTi-validated** companies (Near-term Status = "Targets set"). The SBTi public dataset is the authoritative source — no value re-researching them.
+- **17 companies** verified via this workflow already (in `data/climate_targets_research.csv`): Appen, ASX Ltd, Australian Ethical, Downer EDI, Flight Centre, Fortescue, Inghams, Metrics Credit, nib, Stockland, Vicinity, Woodside, Glencore Holdings, Cleanaway, Stanmore, Coronado, SGH.
+- **High-confidence training-data ASX 200 non-SBTi** (CBA, Westpac, NAB, ANZ, Macquarie, BHP, Rio, Santos, Wesfarmers, AGL, GPT, Amcor, BlueScope, Treasury Wine, ResMed etc.) — already documented well enough that the Confidence flag is "High" in `data/asx200_non_sbti.csv`.
 
-## Prompt to paste into Claude.ai
+## What needs research — 396 companies, prioritised
 
-> I need you to research current climate targets for a list of Australian companies. Search the web with a strong preference for FY24/FY25 sources (annual reports, sustainability reports, climate transition action plans published in 2024 or 2025). Don't use older sources unless nothing newer exists.
+**`data/research_backlog.csv`** has the full list with priority scores. Headline counts:
+
+| Bucket | Count | Priority | Notes |
+|---|---|---|---|
+| **Aus Corporate / FI (SBTi private), Commitment Removed** | 17 | 75 | Private firms whose SBTi commitment was withdrawn — likely have a current internal target |
+| **Aus Corporate / FI (SBTi private), Committed only** | 23 | 70 | SBTi intent letter submitted but not yet validated |
+| **ASX 200 non-SBTi** (Low/Medium-confidence training data) | 57 | 60 | My training-data classifications were uncertain; verify or upgrade |
+| **NGER-only** (no overlay yet) | 299 | scaled by Scope 1 | Big direct emitters; foreign subsidiaries, state utilities, private mining/power |
+
+**Note:** All 11 high-priority ASX-listed SBTi cohort entries (Fortescue, Vicinity, Stockland etc.) are now done — they're not in the backlog.
+
+## Workflow per batch
+
+1. Open ChatGPT or claude.ai (whichever has live web search you prefer)
+2. Paste the prompt below
+3. Append 30–50 company names from `data/research_backlog.csv` (top of the file = highest priority)
+4. The chatbot returns a CSV in a code fence
+5. Append the CSV to `data/climate_targets_research.csv` via GitHub web upload (commits append; existing rows aren't overwritten unless duplicate)
+6. Streamlit auto-redeploys — researched targets override training-data values across all cohorts
+
+## Prompt to use
+
+> I need current climate targets for the Australian companies listed below. Search the web with strong preference for **FY24 or FY25 sources** (sustainability reports, annual reports, climate transition plans published in 2024 or 2025). Don't use older sources unless nothing newer exists.
 >
-> For each company, return one CSV row with these columns (use commas; quote any field containing a comma):
+> Return one CSV row per company inside a single ```csv``` code fence with these columns (use commas; double-quote any field containing a comma):
 >
-> ```
-> Company Name,Stated Target Description,Stated Target Year,Stated Net-Zero Year,Target Classification,Source URL,Confidence,Notes
-> ```
+> `Company Name,Stated Target Description,Stated Target Year,Stated Net-Zero Year,Target Classification,Source URL,Confidence,Notes`
 >
-> **Target Classification** must be exactly one of:
+> **Target Classification** must be one of: `SBTi committed` | `Quantitative non-validated` | `Net-zero only` | `Aspirational` | `No public target`
 >
-> - `SBTi committed` — submitted intent letter to SBTi but not yet validated
-> - `Quantitative non-validated` — has a specific %/year reduction target, but not SBTi-validated
-> - `Net-zero only` — has a long-term net-zero year but no specific near-term reduction target
-> - `Aspirational` — vague climate ambition, no quantified specifics
-> - `No public target` — limited or no public climate disclosure
+> **Confidence** — `High` / `Medium` / `Low`.
 >
-> **Confidence** is `High` / `Medium` / `Low` based on how clearly the target is documented in a recent (FY24/FY25) primary source.
+> **Stated Target Description** — 1–2 sentences with headline number, base year, target year. Don't restate company background.
 >
-> **Stated Target Description** should be 1–2 sentences capturing the headline number, base year, and target year if quantitative. E.g. *"30% absolute Scope 1+2 reduction by 2030 from FY20 baseline; net zero ops by 2050"*. Don't restate company background — just the target.
+> **Source URL** — the actual sustainability/climate report URL, not the homepage.
 >
-> **Source URL** should be the actual sustainability report or climate report URL — not the company homepage.
->
-> Please output the CSV inside a single ```csv code fence so it's easy for me to copy. Don't include explanatory prose between rows. If a company genuinely has no public target after a thorough search, return `No public target` with `Confidence=High` and a brief note why.
->
-> Here is the list of companies to research:
->
-> [PASTE COMPANY NAMES HERE — one per line]
+> Output only the CSV in one code fence, no prose between rows.
 
----
-
-## Priority list (top 100 from `data/research_backlog.csv`)
-
-Tackle these in priority order. The ASX-listed SBTi cohort (priority 100) should be researched first — these are companies that *had* SBTi commitments but removed them or are committed-only, so the public sources will be richest.
-
-### Tier-1 priorities — ASX-listed (SBTi cohort but no validated target)
-
-These are SBTi-committed or commitment-removed cases where the climate strategy is publicly disclosed but not validated.
+## Suggested first batch — top 30 from the new backlog
 
 ```
-Appen Limited
-ASX Limited
-Australian Ethical Investment
-Downer EDI Limited
-Flight Centre Travel Group
-Fortescue Metals Group Ltd
-Inghams Group Ltd
-Metrics Credit Partners
-nib holdings limited
-Stockland Corporation Limited and Stockland Trust
-Vicinity Centres
+The Arnotts Group
+South East Water
+Teachers Mutual Bank
+SMEC ANZ
+Intrepid Travel
+B2R Local No.1 Pty Ltd
+IPEC Pty Ltd (Team Global Express)
+Icon Construction
+Cement Australia Pty Ltd
+Consolidated Property Services (Australia) Pty Ltd
+BAI Communications Pty Ltd
+Airmaster Corporation Pty Ltd
+SECURECORP Pty Ltd
+Yarra Valley Water
+Partners in Performance
+Nando's Australia Pty Ltd
+Accolade Wines
+NEXTDC
+Scentre Group
+Spark New Zealand
+Orica
+Fisher & Paykel Healthcare
+TechnologyOne
+Charter Hall Group
+IGO Limited
+Viva Energy Group
+Ampol
+Endeavour Group
+Metcash
+Worley
 ```
 
-### Tier-2 priorities — large NGER-only emitters without overlay
-
-These are big direct emitters where target verification has high BD value.
-
-```
-[run: python -c "import pandas as pd; df = pd.read_csv('data/research_backlog.csv'); print(df[df['Cohort']=='NGER reporters (not in cohort)'].head(60)['Company Name'].to_string(index=False))"]
-```
-
-### Tier-3 priorities — Australian Corporate / FI (SBTi private)
-
-Privately-held SBTi entities. Smaller individual emissions but each is an SBTi participant by definition, so disclosure exists.
-
----
-
-## After Claude.ai returns CSV
-
-Paste the entire CSV block (including the ```csv fences) back into this Claude Code chat. I'll:
-
-1. Validate the columns
-2. Merge by company name (fuzzy-matched against the cohort)
-3. Commit to the appropriate enrichment file
-4. Re-run the cohort build to confirm coverage
-
-Roughly 100–150 companies per hour of Claude.ai chat time, depending on how cooperative the corporate sites are with web search.
+After this batch, take the top 30 NGER-only entries from the backlog file (sorted by priority desc) — they're the largest emitters in that cohort.

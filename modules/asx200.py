@@ -97,6 +97,7 @@ def to_phase1_shape(asx200: pd.DataFrame) -> pd.DataFrame:
     mapped["Market Cap Tier"] = asx200.get("Market Cap Tier", "")
     mapped["Source URL"] = asx200.get("Source URL", "")
     mapped["Notes"] = asx200.get("Notes", "")
+    mapped["Confidence"] = asx200.get("Confidence", "")
     mapped["Target Classification (BD)"] = mapped["Target Classification"]
     mapped["BD Priority"] = mapped["Target Classification"].map(TARGET_CLASS_BD_PRIORITY).fillna(5).astype(int)
     # Compute ASRS Tier from Market Cap Tier (Mega/Large = Group 1; Mid = Group 2)
