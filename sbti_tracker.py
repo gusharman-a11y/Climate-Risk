@@ -340,6 +340,7 @@ st.caption(
 # ─── Top filter bar (horizontal) ──────────────────────────────────────────────
 sectors = sorted([s for s in screen[CANON["sector"]].dropna().unique() if str(s).strip()])
 cohort_options = [c for c in COHORTS.keys() if c in screen["Cohort"].unique()]
+sbti_options = ["Yes", "No"]
 asrs_tiers_present = [t for t in ["Tier 1", "Tier 1 (proxy)", "Tier 2", "Tier 2 (proxy)", "Tier 3", "Unclassified"]
                       if t in screen.get("ASRS Tier", pd.Series(dtype=str)).unique()]
 
@@ -347,15 +348,15 @@ with st.container(border=True):
     st.caption("**Filters** — change any to narrow the view; defaults show all companies.")
     fcol1, fcol2, fcol3, fcol4 = st.columns([2, 2, 2, 1])
     with fcol1:
-        f_cohort = st.multiselect(
-            "Cohort",
-            cohort_options,
+        f_sbti = st.multiselect(
+            "SBTi target",
+            sbti_options,
             default=[],
-            key="ftr_cohort",
+            key="ftr_sbti",
             help=(
-                "ASX listed (SBTi) — validated SBTi targets. "
-                "Australian Corporate / FI (SBTi, private) — SBTi private cos. "
-                "ASX 200 — no SBTi target — ASX-listed without SBTi."
+                "Yes = company has an SBTi entry (validated, committed, or removed).\n"
+                "No = no SBTi entry — covers ASX 200 without SBTi targets and "
+                "the NGER-reporter universe."
             ),
         )
     with fcol2:
@@ -369,8 +370,7 @@ with st.container(border=True):
                 "**Tier 1**: meets ≥2 of A$500M revenue / A$1B assets / 500 employees.\n"
                 "**Tier 2**: meets ≥2 of A$200M / A$500M / 250.\n"
                 "**Tier 3**: meets ≥2 of A$50M / A$25M / 100.\n\n"
-                "**(proxy)** = revenue/assets/employees not on file; tier inferred "
-                "from market cap tier or SBTi Org Type."
+                "**(proxy)** = revenue/assets/employees not on file; tier inferred."
             ),
         )
     with fcol3:
@@ -378,7 +378,8 @@ with st.container(border=True):
     with fcol4:
         if st.button("↻ Clear filters", use_container_width=True):
             for k in ("ftr_search", "ftr_sector", "ftr_priority", "ftr_yrs",
-                      "ftr_mq", "ftr_cp", "ftr_delivery", "ftr_cohort", "ftr_tier"):
+                      "ftr_mq", "ftr_cp", "ftr_delivery", "ftr_cohort", "ftr_tier",
+                      "ftr_sbti"):
                 if k in st.session_state:
                     del st.session_state[k]
             st.rerun()
@@ -386,6 +387,13 @@ with st.container(border=True):
     with st.expander("More filters", expanded=False):
         gcol1, gcol2, gcol3, gcol4 = st.columns(4)
         with gcol1:
+            f_cohort = st.multiselect(
+                "Cohort (detailed)",
+                cohort_options,
+                default=[],
+                key="ftr_cohort",
+                help="Detailed source cohort — usually the SBTi Yes/No filter is enough.",
+            )
             f_sector = st.multiselect("Sector", sectors, key="ftr_sector")
             f_priority = st.radio(
                 "Outreach priority",
@@ -425,6 +433,9 @@ active_filters: list[str] = []
 filtered = screen.copy()
 total_in_cohort = len(filtered)
 
+if f_sbti:
+    filtered = filtered[filtered["SBTi"].isin(f_sbti)]
+    active_filters.append(f"SBTi: {', '.join(f_sbti)}")
 if f_cohort:
     filtered = filtered[filtered["Cohort"].isin(f_cohort)]
     active_filters.append(f"Cohort: {len(f_cohort)} selected")

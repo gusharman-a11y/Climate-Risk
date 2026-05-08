@@ -320,10 +320,9 @@ COHORTS = {
 
 def build_all(df: pd.DataFrame) -> pd.DataFrame:
     """Combined view of all four cohorts in one DataFrame, with a 'Cohort'
-    column indicating which group each company belongs to. Researched-target
-    overlay is applied last — wherever a company has verified target data
-    in data/climate_targets_research.csv, it overrides any training-data
-    or SBTi-derived target."""
+    column indicating which group each company belongs to. Adds a binary
+    'SBTi' column (Yes / No) for the primary BD filter. Researched-target
+    overlay applied last."""
     parts = []
     for name in COHORTS:
         sub = build_screen(df, cohort=name)
@@ -339,7 +338,11 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
         ascending=[True, True],
         na_position="last",
     ).reset_index(drop=True)
-    # Apply researched overlay (verified target data from external web research)
+    # Binary SBTi flag — "Yes" if the company appears in either SBTi cohort
+    # (validated, committed, or commitment removed), "No" otherwise.
+    out["SBTi"] = out["Cohort"].map(
+        lambda c: "Yes" if c in ("ASX listed (SBTi)", "Australian Corporate / FI (SBTi, private)") else "No"
+    )
     from modules.researched import apply_overlay
     out = apply_overlay(out)
     return out
