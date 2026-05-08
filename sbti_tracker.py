@@ -17,6 +17,7 @@ from modules.sbti_phase1 import (
     DISPLAY_COLS,
     SECTOR_RULES,
     V2_COLOUR,
+    build_all,
     build_screen,
 )
 from modules.phase2 import (
@@ -139,20 +140,7 @@ if sbti_df.empty:
     )
     st.stop()
 
-cohort_choice = st.sidebar.radio(
-    "Cohort",
-    list(COHORTS.keys()),
-    index=0,
-    help=(
-        "**ASX listed (SBTi)** — Australian SBTi-validated cohort with an ASX listing.\n\n"
-        "**Australian Corporate / FI (SBTi, private)** — privately-held large Aussie "
-        "Corporate or FI SBTi entries (excludes SMEs).\n\n"
-        "**ASX 200 — no SBTi target** — major ASX-listed companies that don't have "
-        "an SBTi-validated target. BD signal: ASRS now, SBTi-style scrutiny soon."
-    ),
-)
-is_non_sbti = cohort_choice == "ASX 200 — no SBTi target"
-screen = build_screen(sbti_df, cohort=cohort_choice)
+screen = build_all(sbti_df)
 
 emissions_cache = load_cache()
 
@@ -243,32 +231,46 @@ screen = attach_tpi(screen)
 # ─── Title (filters render below) ─────────────────────────────────────────────
 st.title(f"🇦🇺 ASX SBTi BD tracker")
 st.caption(
-    f"**Cohort:** {cohort_choice}. Companies are scored against SBTi sector "
-    "guidance, the SBTi V2 horizon (2030), TPI Management Quality and Carbon "
-    "Performance frameworks, and reported delivery vs committed trajectory."
+    "All Australian-listed and large private SBTi companies, plus ASX 200 companies "
+    "without SBTi targets. Use the cohort and ASRS Tier filters to slice."
 )
 
 # ─── Top filter bar (horizontal) ──────────────────────────────────────────────
 sectors = sorted([s for s in screen[CANON["sector"]].dropna().unique() if str(s).strip()])
+cohort_options = [c for c in COHORTS.keys() if c in screen["Cohort"].unique()]
+asrs_tiers_present = [t for t in ["Group 1", "Group 2", "Group 2 (proxy)", "Group 3", "Unclassified"]
+                      if t in screen.get("ASRS Tier", pd.Series(dtype=str)).unique()]
 
 with st.container(border=True):
     st.caption("**Filters** — change any to narrow the view; defaults show all companies.")
     fcol1, fcol2, fcol3, fcol4 = st.columns([2, 2, 2, 1])
     with fcol1:
-        search = st.text_input("🔍 Search by company name", key="ftr_search")
-    with fcol2:
-        f_sector = st.multiselect("Sector", sectors, key="ftr_sector")
-    with fcol3:
-        f_priority = st.radio(
-            "Outreach priority",
-            ["All", "High (target ≤2030 or scope gap)", "Low (target >2030 and on track)"],
-            index=0, key="ftr_priority",
-            help="High = target year ≤2030, target year passed, or required scopes missing.",
+        f_cohort = st.multiselect(
+            "Cohort",
+            cohort_options,
+            default=[],
+            key="ftr_cohort",
+            help=(
+                "ASX listed (SBTi) — validated SBTi targets. "
+                "Australian Corporate / FI (SBTi, private) — SBTi private cos. "
+                "ASX 200 — no SBTi target — ASX-listed without SBTi."
+            ),
         )
+    with fcol2:
+        f_tier = st.multiselect(
+            "ASRS Tier",
+            asrs_tiers_present,
+            default=[],
+            key="ftr_tier",
+            help="Group 1 (≥A$500M revenue / ≥A$1B assets / ≥500 employees, meets ≥2). "
+                 "Group 2 (≥A$200M / ≥A$500M / ≥250). 'proxy' = inferred from SBTi org type.",
+        )
+    with fcol3:
+        search = st.text_input("🔍 Search by company name", key="ftr_search")
     with fcol4:
         if st.button("↻ Clear filters", use_container_width=True):
             for k in ("ftr_search", "ftr_sector", "ftr_priority", "ftr_yrs",
-                      "ftr_mq", "ftr_cp", "ftr_delivery"):
+                      "ftr_mq", "ftr_cp", "ftr_delivery", "ftr_cohort", "ftr_tier"):
                 if k in st.session_state:
                     del st.session_state[k]
             st.rerun()
@@ -276,13 +278,20 @@ with st.container(border=True):
     with st.expander("More filters", expanded=False):
         gcol1, gcol2, gcol3, gcol4 = st.columns(4)
         with gcol1:
+            f_sector = st.multiselect("Sector", sectors, key="ftr_sector")
+            f_priority = st.radio(
+                "Outreach priority",
+                ["All", "High (target ≤2030 or scope gap)", "Low (target >2030 and on track)"],
+                index=0, key="ftr_priority",
+                help="High = target year ≤2030, target year passed, or required scopes missing.",
+            )
+        with gcol2:
             f_yrs = st.slider(
                 "Years to target",
                 min_value=-10, max_value=30, value=(-10, 30), step=1,
                 key="ftr_yrs",
                 help="Negative = target year already passed.",
             )
-        with gcol2:
             f_mq = st.multiselect(
                 "Climate maturity (TPI MQ)",
                 ["0", "1", "2", "3", "4", "4*"],
@@ -308,6 +317,12 @@ active_filters: list[str] = []
 filtered = screen.copy()
 total_in_cohort = len(filtered)
 
+if f_cohort:
+    filtered = filtered[filtered["Cohort"].isin(f_cohort)]
+    active_filters.append(f"Cohort: {len(f_cohort)} selected")
+if f_tier:
+    filtered = filtered[filtered.get("ASRS Tier", pd.Series([""] * len(filtered))).isin(f_tier)]
+    active_filters.append(f"ASRS Tier: {', '.join(f_tier)}")
 if search:
     filtered = filtered[filtered[CANON["company"]].str.contains(search, case=False, na=False)]
     active_filters.append(f"Search: \"{search}\"")

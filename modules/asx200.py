@@ -99,4 +99,7 @@ def to_phase1_shape(asx200: pd.DataFrame) -> pd.DataFrame:
     mapped["Notes"] = asx200.get("Notes", "")
     mapped["Target Classification (BD)"] = mapped["Target Classification"]
     mapped["BD Priority"] = mapped["Target Classification"].map(TARGET_CLASS_BD_PRIORITY).fillna(5).astype(int)
+    # Compute ASRS Tier from Market Cap Tier (Mega/Large = Group 1; Mid = Group 2)
+    from modules.sbti import asrs_tier
+    mapped["ASRS Tier"] = mapped.apply(asrs_tier, axis=1)
     return mapped

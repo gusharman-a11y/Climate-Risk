@@ -177,11 +177,26 @@ def asrs_tier(row: pd.Series) -> str:
         return "Group 2"
     if any(row.get(c, 0) for c in ("Revenue (AUD)", "Assets (AUD)", "Employees")):
         return "Group 3"
-    # Fallback proxy: SBTi 'Organization Type' = 'Company' (Large) → assume Group 2 candidate.
+    # ASX 200 cohort proxy via Market Cap Tier
+    mc = str(row.get("Market Cap Tier", "")).strip().lower()
+    if mc == "mega":
+        return "Group 1"
+    if mc == "large":
+        return "Group 1"
+    if mc == "mid":
+        return "Group 2"
+    # Fallback proxy from SBTi 'Organization Type'. SBTi uses 'Corporate', 'SME',
+    # 'Financial Institution'. ASX-listed Corporates and FIs are usually Group 1
+    # by revenue; we mark them 'Group 1 (proxy)' since we can't verify thresholds
+    # without revenue/assets/employees data.
     org = str(row.get(CANON["org_type"], "")).lower()
     if "sme" in org:
         return "Group 3"
-    if "company" in org or "financial" in org:
+    if "corporate" in org or "company" in org or "financial" in org:
+        # ASX-listed (AU ISIN) → almost certainly Group 1
+        isin = str(row.get(CANON["isin"], "")).strip().upper()
+        if isin.startswith("AU"):
+            return "Group 1 (proxy)"
         return "Group 2 (proxy)"
     return "Unclassified"
 

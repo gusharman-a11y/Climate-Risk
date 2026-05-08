@@ -317,6 +317,30 @@ COHORTS = {
 }
 
 
+def build_all(df: pd.DataFrame) -> pd.DataFrame:
+    """Combined view of all three cohorts in one DataFrame, with a 'Cohort'
+    column indicating which group each company belongs to. Used when the
+    UI wants a single unified view filtered by cohort rather than a hard
+    cohort switch."""
+    parts = []
+    for name in COHORTS:
+        sub = build_screen(df, cohort=name)
+        if not sub.empty:
+            sub = sub.copy()
+            sub["Cohort"] = name
+            parts.append(sub)
+    if not parts:
+        return pd.DataFrame()
+    out = pd.concat(parts, ignore_index=True, sort=False)
+    # Sort: SBTi-validated first (low Years to Target), non-SBTi by BD priority
+    out = out.sort_values(
+        ["Cohort", "Years to Target"],
+        ascending=[True, True],
+        na_position="last",
+    ).reset_index(drop=True)
+    return out
+
+
 def build_screen(df: pd.DataFrame, cohort: str = "ASX listed (SBTi)") -> pd.DataFrame:
     """Phase 1 output: cohort + adequacy + V2 reset columns,
     sorted by Years to Target ascending (NaN last).
@@ -346,6 +370,12 @@ def build_screen(df: pd.DataFrame, cohort: str = "ASX listed (SBTi)") -> pd.Data
     sub = fn(df)
     if sub.empty:
         return sub
+    # Compute ASRS Tier for SBTi cohorts (proxy via Org Type since we don't have
+    # revenue/assets/employees numbers).
+    if "ASRS Tier" not in sub.columns:
+        from modules.sbti import asrs_tier
+        sub = sub.copy()
+        sub["ASRS Tier"] = sub.apply(asrs_tier, axis=1)
     extra = sub.apply(assess_row, axis=1, result_type="expand")
     out = pd.concat([sub.reset_index(drop=True), extra.reset_index(drop=True)], axis=1)
     out = out.sort_values("Years to Target", ascending=True, na_position="last").reset_index(drop=True)
@@ -359,7 +389,7 @@ def build_screen(df: pd.DataFrame, cohort: str = "ASX listed (SBTi)") -> pd.Data
 
 # Note: ISIN intentionally omitted from default display — not useful for BD work.
 DISPLAY_COLS = [
-    CANON["company"], CANON["sector"],
+    CANON["company"], "Cohort", "ASRS Tier", CANON["sector"],
     "Applicable SBTi Guidance",
     "MQ Level", "CP Alignment",
     CANON["near_term_status"], "Target Year (used)", "Year Source", "Years to Target",
