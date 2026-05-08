@@ -26,6 +26,41 @@ import pandas as pd
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
+
+def find_committed_nger() -> Path | None:
+    """Look for a committed NGER spreadsheet in data/. Returns the path of the
+    first match, preferring filenames with the latest year. Returns None if
+    no candidate found."""
+    if not DATA_DIR.exists():
+        return None
+    candidates = []
+    for p in DATA_DIR.iterdir():
+        n = p.name.lower()
+        if not p.is_file():
+            continue
+        if not (n.endswith(".xlsx") or n.endswith(".xls")):
+            continue
+        if "nger" in n or "corporate-emissions" in n or "corporate_emissions" in n:
+            candidates.append(p)
+    if not candidates:
+        return None
+    # Prefer newest by filename year token, then mtime
+    def year_key(p: Path) -> int:
+        m = re.search(r"(20\d{2})", p.name)
+        return int(m.group(1)) if m else 0
+    candidates.sort(key=lambda p: (year_key(p), p.stat().st_mtime), reverse=True)
+    return candidates[0]
+
+
+def infer_year_from_filename(path: Path) -> int | None:
+    """Extract a 4-digit year from a NGER filename (e.g. '2024-25', '2025')."""
+    m = re.findall(r"20\d{2}", path.name)
+    if not m:
+        return None
+    # Filename like '2024-25' → return the higher year (FY end)
+    return max(int(y) for y in m)
+
+
 HEADER_ALIASES = {
     "reporting_entity": [
         "reporting entity name", "reporting entity", "controlling corporation",

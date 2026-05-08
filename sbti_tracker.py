@@ -6,6 +6,7 @@ Run: streamlit run sbti_tracker.py
 from __future__ import annotations
 
 import io
+from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
@@ -37,7 +38,12 @@ from modules.scraper import (
     parse_emissions,
     search_report_url,
 )
-from modules.nger import load_nger, inject_to_cache as nger_inject_to_cache
+from modules.nger import (
+    find_committed_nger,
+    infer_year_from_filename,
+    inject_to_cache as nger_inject_to_cache,
+    load_nger,
+)
 from modules.tpi import MQ_COLOUR, CP_COLOUR, attach_tpi
 
 
@@ -144,6 +150,39 @@ if sbti_df.empty:
 screen = build_all(sbti_df)
 
 emissions_cache = load_cache()
+
+
+# Auto-import a committed NGER spreadsheet if present and not already imported
+@st.cache_data(show_spinner="Importing committed NGER data…")
+def _auto_import_nger(nger_path_str: str, mtime: float, cohort_names_tuple: tuple, isin_pairs: tuple):
+    """Cached wrapper — keys on path + mtime so we don't re-import on every rerun."""
+    p = Path(nger_path_str)
+    nger_df = load_nger(p)
+    year = infer_year_from_filename(p) or 2025
+    isin_lookup = dict(isin_pairs)
+    return nger_df, year, isin_lookup
+
+
+_committed_nger = find_committed_nger()
+if _committed_nger is not None:
+    try:
+        nger_df, _yr, _isin_lookup = _auto_import_nger(
+            str(_committed_nger),
+            _committed_nger.stat().st_mtime,
+            tuple(screen[CANON["company"]].dropna().astype(str)),
+            tuple(zip(screen[CANON["company"]].astype(str),
+                      screen.get(CANON["isin"], pd.Series([""] * len(screen))).astype(str))),
+        )
+        already_imported = any(
+            any(h.get("source") == "nger" and h.get("year") == _yr for h in rec.get("history", []))
+            for rec in emissions_cache.values()
+        )
+        if not already_imported:
+            cohort_names = list(screen[CANON["company"]].dropna().unique())
+            nger_inject_to_cache(nger_df, cohort_names, emissions_cache, _yr, _isin_lookup)
+            save_cache(emissions_cache)
+    except Exception as exc:
+        st.sidebar.warning(f"NGER auto-import skipped: {exc}")
 
 with st.sidebar.expander("📊 Reported emissions", expanded=False):
     emissions_csv = st.file_uploader(
