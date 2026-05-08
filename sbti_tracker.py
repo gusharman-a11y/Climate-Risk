@@ -238,7 +238,7 @@ st.caption(
 # ─── Top filter bar (horizontal) ──────────────────────────────────────────────
 sectors = sorted([s for s in screen[CANON["sector"]].dropna().unique() if str(s).strip()])
 cohort_options = [c for c in COHORTS.keys() if c in screen["Cohort"].unique()]
-asrs_tiers_present = [t for t in ["Group 1", "Group 2", "Group 2 (proxy)", "Group 3", "Unclassified"]
+asrs_tiers_present = [t for t in ["Tier 1", "Tier 1 (proxy)", "Tier 2", "Tier 2 (proxy)", "Tier 3", "Unclassified"]
                       if t in screen.get("ASRS Tier", pd.Series(dtype=str)).unique()]
 
 with st.container(border=True):
@@ -258,12 +258,18 @@ with st.container(border=True):
         )
     with fcol2:
         f_tier = st.multiselect(
-            "ASRS Tier",
+            "AASB S2 / ASRS reporting tier",
             asrs_tiers_present,
             default=[],
             key="ftr_tier",
-            help="Group 1 (≥A$500M revenue / ≥A$1B assets / ≥500 employees, meets ≥2). "
-                 "Group 2 (≥A$200M / ≥A$500M / ≥250). 'proxy' = inferred from SBTi org type.",
+            help=(
+                "Per AASB S2 Climate-related Disclosures (the Australian ISSB-aligned standard).\n\n"
+                "**Tier 1**: meets ≥2 of A$500M revenue / A$1B assets / 500 employees.\n"
+                "**Tier 2**: meets ≥2 of A$200M / A$500M / 250.\n"
+                "**Tier 3**: meets ≥2 of A$50M / A$25M / 100.\n\n"
+                "**(proxy)** = revenue/assets/employees not on file; tier inferred "
+                "from market cap tier or SBTi Org Type."
+            ),
         )
     with fcol3:
         search = st.text_input("🔍 Search by company name", key="ftr_search")
