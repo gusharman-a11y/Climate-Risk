@@ -298,6 +298,20 @@ def inject_to_cache(
 
 # ─── NGER-only cohort ─────────────────────────────────────────────────────────
 
+def _load_nger_target_overlay() -> pd.DataFrame:
+    """Read the curated data/nger_targets.csv if present.
+    Provides parent-company target details for top NGER-only emitters."""
+    p = DATA_DIR / "nger_targets.csv"
+    if not p.exists():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(p)
+        df.columns = [c.strip() for c in df.columns]
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
 def build_nger_only_cohort(existing_cohort_names: list[str]) -> pd.DataFrame:
     """Return a phase1-shape DataFrame of NGER reporters who are NOT already
     in another cohort. Used as Cohort 4 in the unified view.
@@ -366,12 +380,55 @@ def build_nger_only_cohort(existing_cohort_names: list[str]) -> pd.DataFrame:
     out["NGER Scope 2 (tCO2e)"] = nger_only["Scope 2 (tCO2e)"]
     out["NGER Total Energy (GJ)"] = nger_only["Total Energy (GJ)"]
 
+    # Merge in target overlay where available (parent-company targets for
+    # top emitters from training-data research)
+    overlay = _load_nger_target_overlay()
+    if not overlay.empty:
+        # Match by lowercase entity name
+        overlay["_key"] = overlay["NGER Reporting Entity"].astype(str).str.lower().str.strip()
+        out["_key"] = out["Company Name"].astype(str).str.lower().str.strip()
+        out = out.merge(
+            overlay[["_key", "Parent / Owner", "Stated Target Description",
+                     "Stated Target Year", "Stated Net-Zero Year",
+                     "Target Classification", "Source URL", "Confidence", "Notes"]]
+            .rename(columns={
+                "Parent / Owner": "_parent",
+                "Stated Target Description": "_target_desc",
+                "Stated Target Year": "_target_year",
+                "Stated Net-Zero Year": "_nz_year",
+                "Target Classification": "_target_class",
+                "Source URL": "_source_url",
+                "Confidence": "_confidence",
+                "Notes": "_overlay_notes",
+            }),
+            on="_key", how="left",
+        )
+        # Apply overlay where present
+        mask = out["_target_desc"].notna()
+        out.loc[mask, "Target"] = out.loc[mask, "_target_desc"]
+        out.loc[mask, "Target Classification"] = out.loc[mask, "_target_class"]
+        out.loc[mask, "Target Classification (Long)"] = out.loc[mask, "_target_class"]
+        out.loc[mask, "Sector"] = "NGER reporter (target overlay applied)"
+        # Coerce year columns
+        for src, dst in [("_target_year", "Target Year"), ("_nz_year", "Net-Zero Year")]:
+            yr = pd.to_numeric(out[src], errors="coerce")
+            out.loc[mask & yr.notna(), dst] = yr[mask & yr.notna()]
+        # Drop helper columns
+        out = out.drop(columns=[c for c in out.columns if c.startswith("_")
+                                and c not in ("_parent", "_confidence", "_source_url", "_overlay_notes")])
+        # Surface the overlay extras as columns
+        out = out.rename(columns={
+            "_parent": "Parent / Owner",
+            "_confidence": "Target Confidence",
+            "_source_url": "Source URL",
+            "_overlay_notes": "Overlay Notes",
+        })
+
     # Sort by Scope 1 descending (biggest emitters first — strongest BD signal)
     out = out.sort_values("NGER Scope 1 (tCO2e)", ascending=False, na_position="last").reset_index(drop=True)
 
     # Compute ASRS Tier — NGER threshold (>50 ktCO2e Scope 1+2 OR >200 TJ) implies
-    # the entity is large enough to be Tier 1 by emissions; without revenue data
-    # we can't verify the financial thresholds, so mark as Tier 1 (NGER proxy).
+    # the entity is large enough to be Tier 1 by emissions.
     out["ASRS Tier"] = "Tier 1 (NGER proxy)"
 
     return out
