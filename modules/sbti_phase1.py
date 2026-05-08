@@ -319,10 +319,11 @@ COHORTS = {
 
 
 def build_all(df: pd.DataFrame) -> pd.DataFrame:
-    """Combined view of all three cohorts in one DataFrame, with a 'Cohort'
-    column indicating which group each company belongs to. Used when the
-    UI wants a single unified view filtered by cohort rather than a hard
-    cohort switch."""
+    """Combined view of all four cohorts in one DataFrame, with a 'Cohort'
+    column indicating which group each company belongs to. Researched-target
+    overlay is applied last — wherever a company has verified target data
+    in data/climate_targets_research.csv, it overrides any training-data
+    or SBTi-derived target."""
     parts = []
     for name in COHORTS:
         sub = build_screen(df, cohort=name)
@@ -333,12 +334,14 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
     if not parts:
         return pd.DataFrame()
     out = pd.concat(parts, ignore_index=True, sort=False)
-    # Sort: SBTi-validated first (low Years to Target), non-SBTi by BD priority
     out = out.sort_values(
         ["Cohort", "Years to Target"],
         ascending=[True, True],
         na_position="last",
     ).reset_index(drop=True)
+    # Apply researched overlay (verified target data from external web research)
+    from modules.researched import apply_overlay
+    out = apply_overlay(out)
     return out
 
 
