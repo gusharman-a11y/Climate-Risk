@@ -241,6 +241,8 @@ screen = attach_tpi(screen)
 
 
 st.sidebar.markdown("### Filter the cohort")
+st.sidebar.caption("Default = no filters → all companies show. Active filters appear as chips at the top of the main view.")
+
 search = st.sidebar.text_input("🔍 Search by company name")
 
 sectors = sorted([s for s in screen[CANON["sector"]].dropna().unique() if str(s).strip()])
@@ -257,7 +259,7 @@ with st.sidebar.expander("More filters", expanded=False):
     f_yrs = st.slider(
         "Years to target",
         min_value=-10, max_value=30, value=(-10, 30), step=1,
-        help="Negative = target year already passed.",
+        help="Negative = target year already passed. Default range covers everything.",
     )
     f_mq = st.multiselect("Climate maturity (TPI MQ Level)", ["0", "1", "2", "3", "4", "4*"])
     f_cp = st.multiselect(
@@ -267,29 +269,61 @@ with st.sidebar.expander("More filters", expanded=False):
     )
     f_delivery = st.multiselect("Delivery RAG", ["Green", "Amber", "Red", "N/A"])
 
+# Track which filters are actually narrowing the view, for chip display
+active_filters: list[str] = []
+
 filtered = screen.copy()
+total_in_cohort = len(filtered)
+
 if search:
     filtered = filtered[filtered[CANON["company"]].str.contains(search, case=False, na=False)]
+    active_filters.append(f"Search: \"{search}\"")
 if f_sector:
     filtered = filtered[filtered[CANON["sector"]].isin(f_sector)]
+    active_filters.append(f"Sector: {len(f_sector)} selected")
 if f_priority == "High (target ≤2030 or scope gap)":
     filtered = filtered[filtered["V2 Reset Likely"] == "Yes"]
+    active_filters.append("Outreach: High priority only")
 elif f_priority == "Low (target >2030 and on track)":
     filtered = filtered[filtered["V2 Reset Likely"] == "No"]
+    active_filters.append("Outreach: Low priority only")
 yrs_lo, yrs_hi = f_yrs
-mask = filtered["Years to Target"].between(yrs_lo, yrs_hi, inclusive="both")
-mask = mask | filtered["Years to Target"].isna()
-filtered = filtered[mask]
+if (yrs_lo, yrs_hi) != (-10, 30):
+    mask = filtered["Years to Target"].between(yrs_lo, yrs_hi, inclusive="both")
+    mask = mask | filtered["Years to Target"].isna()
+    filtered = filtered[mask]
+    active_filters.append(f"Years to target: {yrs_lo}…{yrs_hi}")
 if f_mq:
     filtered = filtered[filtered["MQ Level"].isin(f_mq)]
+    active_filters.append(f"MQ Level: {', '.join(f_mq)}")
 if f_cp:
     filtered = filtered[filtered["CP Alignment"].isin(f_cp)]
+    active_filters.append(f"CP Alignment: {len(f_cp)} selected")
 if f_delivery:
     filtered = filtered[filtered["Delivery RAG"].isin(f_delivery)]
+    active_filters.append(f"Delivery RAG: {', '.join(f_delivery)}")
 
 
 # ─── Main: header + KPIs ───────────────────────────────────────────────────────
 st.title(f"🇦🇺 ASX SBTi BD tracker")
+
+# Active-filter chips + counter
+if active_filters:
+    chip_html = " ".join(
+        f"<span style='display:inline-block; background:#1E40AF22; color:#1E40AF; "
+        f"padding:2px 10px; border-radius:12px; font-size:0.82rem; "
+        f"font-weight:500; margin-right:6px;'>{f}</span>"
+        for f in active_filters
+    )
+    st.markdown(
+        f"**Showing {len(filtered)} of {total_in_cohort} companies in cohort**  &nbsp; {chip_html}",
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        f"**Showing all {total_in_cohort} companies in cohort** — no filters active. "
+        "Use the sidebar to narrow the view."
+    )
 st.caption(
     f"**Cohort:** {cohort_choice}. Companies are scored against SBTi sector "
     "guidance, the SBTi V2 horizon (2030), TPI Management Quality and Carbon "
