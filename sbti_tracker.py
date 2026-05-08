@@ -184,18 +184,33 @@ with st.sidebar.expander("📊 Reported emissions", expanded=False):
 
 stored_urls = load_stored_urls()
 if stored_urls:
-    with st.sidebar.expander(f"🌐 Stored report URLs ({len(stored_urls)})", expanded=False):
+    n_sbti = sum(1 for r in stored_urls if r.get("source") == "sbti")
+    n_asx200 = sum(1 for r in stored_urls if r.get("source") == "asx200")
+    with st.sidebar.expander(
+        f"🌐 Stored report URLs ({len(stored_urls)})", expanded=False
+    ):
         st.caption(
-            "Curated sustainability-report PDF URLs for the cohort. "
-            "Click 'Fetch all' to download + parse each report and populate "
-            "the emissions cache. Runs on this server's network."
+            f"**{n_sbti}** SBTi cohort + **{n_asx200}** non-SBTi cohort URLs. "
+            "Click 'Fetch all' to download + parse each report. Runs on this "
+            "server's network — Streamlit Cloud reaches most corporate sites; "
+            "this dev sandbox does not."
+        )
+        scope = st.radio(
+            "Which to fetch",
+            ["All", "SBTi cohort only", "Non-SBTi cohort only"],
+            index=0, horizontal=True,
         )
         if st.button("⚡ Fetch + parse all stored reports"):
+            target = stored_urls
+            if scope == "SBTi cohort only":
+                target = [r for r in stored_urls if r.get("source") == "sbti"]
+            elif scope == "Non-SBTi cohort only":
+                target = [r for r in stored_urls if r.get("source") == "asx200"]
             progress = st.progress(0.0)
             log_box = st.empty()
             successes, failures = [], []
-            n = len(stored_urls)
-            for i, rec in enumerate(stored_urls, start=1):
+            n = len(target)
+            for i, rec in enumerate(target, start=1):
                 progress.progress(i / n, text=f"{i}/{n} {rec['company']}")
                 try:
                     parsed = fetch_and_parse(rec["url"])
@@ -217,7 +232,11 @@ if stored_urls:
                 except Exception as exc:
                     failures.append((rec["company"], str(exc)[:120]))
             save_cache(emissions_cache)
-            log_box.success(f"Fetched: {len(successes)} / {n}. Reload the page to refresh the table.")
+            log_box.success(
+                f"Fetched: {len(successes)} / {n}. "
+                f"Now click 💾 Download emissions cache (above) and send the "
+                f"file to Claude — Claude commits it so the data persists for the team."
+            )
             if failures:
                 with log_box.container():
                     st.error(f"Failed: {len(failures)}")

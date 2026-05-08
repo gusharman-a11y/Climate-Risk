@@ -281,6 +281,7 @@ def fetch_and_parse(url: str) -> dict:
 from pathlib import Path
 
 _URLS_CSV = Path(__file__).resolve().parent.parent / "data" / "report_urls.csv"
+_ASX200_CSV = Path(__file__).resolve().parent.parent / "data" / "asx200_non_sbti.csv"
 
 
 def _norm(name: str) -> str:
@@ -288,31 +289,57 @@ def _norm(name: str) -> str:
 
 
 def load_stored_urls():
-    """Read data/report_urls.csv. Returns a list of dicts with keys
-    'company', 'name_norm', 'report', 'period', 'url', 'notes'.
-    Returns [] if the file is missing or unreadable."""
-    if not _URLS_CSV.exists():
-        return []
+    """Read curated report URLs from both data/report_urls.csv (SBTi cohort)
+    and data/asx200_non_sbti.csv (non-SBTi cohort). Returns a list of dicts
+    with keys 'company', 'name_norm', 'report', 'period', 'url', 'notes',
+    'source' ('sbti' or 'asx200')."""
+    rows = []
     try:
         import pandas as pd
-        df = pd.read_csv(_URLS_CSV)
-        df.columns = [c.strip() for c in df.columns]
+        if _URLS_CSV.exists():
+            df = pd.read_csv(_URLS_CSV)
+            df.columns = [c.strip() for c in df.columns]
+            for _, r in df.iterrows():
+                company = str(r.get("SBTi Company Name", "")).strip()
+                if not company:
+                    continue
+                rows.append({
+                    "company": company,
+                    "name_norm": _norm(company),
+                    "report": str(r.get("Report Name", "")).strip(),
+                    "period": str(r.get("Reporting Period", "")).strip(),
+                    "url": str(r.get("URL", "")).strip(),
+                    "notes": str(r.get("Notes", "") or "").strip(),
+                    "source": "sbti",
+                })
+        if _ASX200_CSV.exists():
+            df = pd.read_csv(_ASX200_CSV)
+            df.columns = [c.strip() for c in df.columns]
+            for _, r in df.iterrows():
+                company = str(r.get("Company Name", "")).strip()
+                url = str(r.get("Source URL", "")).strip()
+                if not company or not url or url.lower() in ("nan", ""):
+                    continue
+                rows.append({
+                    "company": company,
+                    "name_norm": _norm(company),
+                    "report": "Sustainability/IR landing",
+                    "period": str(r.get("Stated Target Year", "")).strip(),
+                    "url": url,
+                    "notes": str(r.get("Notes", "") or "").strip(),
+                    "source": "asx200",
+                })
     except Exception:
-        return []
-    rows = []
-    for _, r in df.iterrows():
-        company = str(r.get("SBTi Company Name", "")).strip()
-        if not company:
+        return rows
+    # De-duplicate by URL — keep the first occurrence (sbti cohort takes priority)
+    seen = set()
+    unique = []
+    for r in rows:
+        if r["url"] in seen:
             continue
-        rows.append({
-            "company": company,
-            "name_norm": _norm(company),
-            "report": str(r.get("Report Name", "")).strip(),
-            "period": str(r.get("Reporting Period", "")).strip(),
-            "url": str(r.get("URL", "")).strip(),
-            "notes": str(r.get("Notes", "") or "").strip(),
-        })
-    return rows
+        seen.add(r["url"])
+        unique.append(r)
+    return unique
 
 
 def lookup_stored_url(company: str, isin: str | None = None,
