@@ -294,3 +294,84 @@ def inject_to_cache(
 
     unmatched = [c for c in cohort_names if c not in matches]
     return ingested, unmatched
+
+
+# ─── NGER-only cohort ─────────────────────────────────────────────────────────
+
+def build_nger_only_cohort(existing_cohort_names: list[str]) -> pd.DataFrame:
+    """Return a phase1-shape DataFrame of NGER reporters who are NOT already
+    in another cohort. Used as Cohort 4 in the unified view.
+
+    Each row carries the company name, NGER ABN, Scope 1+2, energy, and
+    placeholder target columns (since we don't know targets for these). The
+    BD signal is 'large emitter, status unknown — research before outreach'.
+    """
+    p = find_committed_nger()
+    if p is None:
+        return pd.DataFrame()
+    try:
+        nger = load_nger(p)
+    except Exception:
+        return pd.DataFrame()
+    if nger.empty:
+        return nger
+
+    # Find which NGER reporters are already represented in the other cohorts.
+    matches = match_to_cohort(nger, existing_cohort_names)
+    matched_nger_entities = set(matches.values())
+
+    nger_only = nger[~nger["Reporting Entity"].isin(matched_nger_entities)].copy()
+    if nger_only.empty:
+        return nger_only
+
+    # Drop placeholder rows (NaN data) just in case
+    nger_only = nger_only[
+        nger_only["Scope 1 (tCO2e)"].notna() | nger_only["Scope 2 (tCO2e)"].notna()
+    ].reset_index(drop=True)
+
+    # Title-case the entity name for nicer display
+    nger_only["Reporting Entity"] = nger_only["Reporting Entity"].astype(str).str.title()
+
+    out = pd.DataFrame()
+    out["Company Name"] = nger_only["Reporting Entity"]
+    out["ISIN"] = ""
+    out["Country"] = "Australia"
+    out["Region"] = "Oceania"
+    out["Sector"] = "NGER reporter (sector unclassified)"
+    out["Industry"] = ""
+    out["Organization Type"] = "NGER reporter"
+    out["Near-term Status"] = ""
+    out["Long-term Status"] = ""
+    out["Net-Zero Status"] = ""
+    out["Target"] = ""
+    out["Target Year"] = pd.NA
+    out["Long-term Target Year"] = pd.NA
+    out["Net-Zero Year"] = pd.NA
+    out["Target Classification"] = "Not assessed (NGER reporter)"
+    out["Target Classification (Long)"] = "Not assessed (NGER reporter)"
+    out["BA1.5 Status"] = ""
+    out["BA1.5 Date"] = ""
+    out["Removal/Extension Reason"] = ""
+    out["Date Committed"] = pd.NA
+    out["Date Published"] = pd.NA
+    out["Date Updated"] = pd.NA
+    out["SBTi ID"] = ""
+    out["LEI"] = ""
+    out["Base Year"] = pd.NA
+    out["Ambition"] = ""
+
+    # NGER-specific extras
+    out["ABN"] = nger_only["ABN"]
+    out["NGER Scope 1 (tCO2e)"] = nger_only["Scope 1 (tCO2e)"]
+    out["NGER Scope 2 (tCO2e)"] = nger_only["Scope 2 (tCO2e)"]
+    out["NGER Total Energy (GJ)"] = nger_only["Total Energy (GJ)"]
+
+    # Sort by Scope 1 descending (biggest emitters first — strongest BD signal)
+    out = out.sort_values("NGER Scope 1 (tCO2e)", ascending=False, na_position="last").reset_index(drop=True)
+
+    # Compute ASRS Tier — NGER threshold (>50 ktCO2e Scope 1+2 OR >200 TJ) implies
+    # the entity is large enough to be Tier 1 by emissions; without revenue data
+    # we can't verify the financial thresholds, so mark as Tier 1 (NGER proxy).
+    out["ASRS Tier"] = "Tier 1 (NGER proxy)"
+
+    return out

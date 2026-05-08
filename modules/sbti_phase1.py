@@ -314,6 +314,7 @@ COHORTS = {
     "ASX listed (SBTi)": filter_asx,
     "Australian Corporate / FI (SBTi, private)": filter_au_private,
     "ASX 200 — no SBTi target": None,  # Loaded from a separate CSV, not filtered from SBTi data
+    "NGER reporters (not in cohort)": None,  # Loaded from NGER xlsx; large-emitter universe
 }
 
 
@@ -353,13 +354,30 @@ def build_screen(df: pd.DataFrame, cohort: str = "ASX listed (SBTi)") -> pd.Data
         sub = to_phase1_shape(load_asx200())
         if sub.empty:
             return sub
-        # Run assess_row anyway — most outputs will be N/A for non-SBTi rows,
-        # but the column structure stays consistent with the SBTi cohorts.
         extra = sub.apply(assess_row, axis=1, result_type="expand")
         out = pd.concat([sub.reset_index(drop=True), extra.reset_index(drop=True)], axis=1)
-        # Sort by BD priority descending (highest = no public target = strongest signal)
         if "BD Priority" in out.columns:
             out = out.sort_values("BD Priority", ascending=False).reset_index(drop=True)
+        return out
+
+    if cohort == "NGER reporters (not in cohort)":
+        from modules.nger import build_nger_only_cohort
+        # Compute the names already represented in the SBTi + ASX200 cohorts so
+        # we can de-dup against them.
+        already = []
+        for other in ("ASX listed (SBTi)", "Australian Corporate / FI (SBTi, private)",
+                      "ASX 200 — no SBTi target"):
+            try:
+                other_sub = build_screen(df, cohort=other)
+                if not other_sub.empty:
+                    already.extend(other_sub["Company Name"].astype(str).tolist())
+            except Exception:
+                continue
+        sub = build_nger_only_cohort(already)
+        if sub.empty:
+            return sub
+        extra = sub.apply(assess_row, axis=1, result_type="expand")
+        out = pd.concat([sub.reset_index(drop=True), extra.reset_index(drop=True)], axis=1)
         return out
 
     if df.empty:
