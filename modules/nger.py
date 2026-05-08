@@ -63,25 +63,27 @@ def infer_year_from_filename(path: Path) -> int | None:
 
 HEADER_ALIASES = {
     "reporting_entity": [
+        "organisation name", "organization name",
         "reporting entity name", "reporting entity", "controlling corporation",
         "controlling corporation name", "corporate group name", "company name",
-        "registered corporation", "name", "entity name",
+        "registered corporation", "entity name",
     ],
-    "abn": ["abn"],
+    "abn": ["abn", "identifying details", "abn or acn", "acn"],
     "scope1": [
         "total scope 1 emissions (t co2-e)", "total scope 1 emissions",
         "scope 1 emissions (t co2-e)", "scope 1 emissions", "scope 1 (t co2-e)",
         "scope 1 emissions in tco2-e", "total scope 1 (t co2-e)",
-        "scope 1 (tco2e)", "scope 1",
+        "scope 1 (tco2e)",
     ],
     "scope2": [
         "total scope 2 emissions (t co2-e)", "total scope 2 emissions",
         "scope 2 emissions (t co2-e)", "scope 2 emissions",
         "scope 2 (t co2-e)", "scope 2 emissions in tco2-e",
         "scope 2 location-based emissions (t co2-e)",
-        "scope 2 (tco2e)", "scope 2",
+        "scope 2 (tco2e)",
     ],
     "energy": [
+        "net energy consumed (gj)",
         "total net energy consumption (gj)", "total net energy consumption",
         "net energy consumption (gj)", "energy consumption (gj)",
         "total energy (gj)", "total energy consumed (gj)",
@@ -129,8 +131,8 @@ def load_nger(file: io.BytesIO | Path | bytes) -> pd.DataFrame:
     best_mapping: dict[str, str] = {}
 
     for sheet in xls.sheet_names:
-        # Try header at row 0, 1, 2 (CER often has title rows above the header)
-        for hdr in (0, 1, 2, 3):
+        # Try header at row 0..6 (CER often has title rows above the header)
+        for hdr in (0, 1, 2, 3, 4, 5, 6):
             try:
                 df = pd.read_excel(xls, sheet_name=sheet, header=hdr)
             except Exception:
@@ -144,8 +146,14 @@ def load_nger(file: io.BytesIO | Path | bytes) -> pd.DataFrame:
                 "Scope 2 (tCO2e)": _match_column(df.columns.tolist(), HEADER_ALIASES["scope2"]),
                 "Total Energy (GJ)": _match_column(df.columns.tolist(), HEADER_ALIASES["energy"]),
             }
-            # Need Reporting Entity + at least one of Scope 1 / Scope 2
-            if mapping["Reporting Entity"] and (mapping["Scope 1 (tCO2e)"] or mapping["Scope 2 (tCO2e)"]):
+            # Sanity check: Scope 1 and Scope 2 must come from DIFFERENT source columns,
+            # and neither should equal the Reporting Entity source. Otherwise the matcher
+            # has latched onto a single long-text cell (disclaimer / title) by substring.
+            non_null_sources = [v for v in mapping.values() if v]
+            if len(non_null_sources) != len(set(non_null_sources)):
+                continue  # at least two canonicals share a source column → not a real header
+            # Need Reporting Entity + Scope 1 + Scope 2
+            if mapping["Reporting Entity"] and mapping["Scope 1 (tCO2e)"] and mapping["Scope 2 (tCO2e)"]:
                 best_df = df
                 best_mapping = mapping
                 break
@@ -178,8 +186,8 @@ def load_nger(file: io.BytesIO | Path | bytes) -> pd.DataFrame:
 
 _STRIP_TOKENS = (
     "limited", "ltd", "pty", "group holdings", "holdings", "group",
-    "corporation", "corp", "plc", "the ", "australia", "(asx listed)",
-    "and", "&",
+    "corporation", "corp", "plc", "the", "australia", "australian",
+    "new", "zealand", "(asx listed)", "and", "&",
 )
 
 
@@ -192,31 +200,55 @@ def _name_key(name: str) -> str:
 
 def match_to_cohort(nger: pd.DataFrame, cohort_names: list[str]) -> dict[str, str]:
     """For each cohort company, find the best-matching NGER reporter.
-    Returns a dict mapping cohort name → NGER reporting entity name."""
-    nger_keys = {_name_key(name): name for name in nger["Reporting Entity"]}
+    Returns a dict mapping cohort name → NGER reporting entity name.
+
+    Algorithm:
+      1. Exact normalised-key match.
+      2. Token-overlap with ≥2 shared tokens (handles multi-word names robustly).
+      3. First-token equality: cohort first token == NGER first token AND
+         that first token isn't shared by multiple unrelated NGER reporters
+         (avoids 'national' / 'new' / 'australian' false matches).
+    """
+    nger_pairs = [(_name_key(name), name) for name in nger["Reporting Entity"] if _name_key(name)]
+    nger_keys = dict(nger_pairs)
+
+    # Frequency of each first token across NGER (for first-token uniqueness)
+    from collections import Counter
+    first_token_count: Counter = Counter(nk.split()[0] for nk, _ in nger_pairs if nk.split())
+
     matches: dict[str, str] = {}
     for cohort in cohort_names:
         ck = _name_key(cohort)
         if not ck:
             continue
-        # Exact key match
+        ck_tokens = ck.split()
+        if not ck_tokens:
+            continue
+
+        # 1. Exact key
         if ck in nger_keys:
             matches[cohort] = nger_keys[ck]
             continue
-        # Substring either way
-        for nk, nname in nger_keys.items():
-            if not nk:
+
+        # 2. Token-overlap (best score wins, requires ≥2 shared tokens OR
+        #    ≥1 shared and the cohort/NGER side has ≤2 tokens total)
+        best, best_score = None, 0.0
+        ck_set = set(ck_tokens)
+        for nk, nname in nger_pairs:
+            nk_set = set(nk.split())
+            shared = ck_set & nk_set
+            if not shared:
                 continue
-            if ck in nk or nk in ck:
-                matches[cohort] = nname
-                break
-        else:
-            # First-token match (e.g. 'bhp' matches 'bhp billiton ltd')
-            ck_first = ck.split()[0] if ck else ""
-            for nk, nname in nger_keys.items():
-                if ck_first and nk.split() and nk.split()[0] == ck_first:
-                    matches[cohort] = nname
-                    break
+            shorter_size = min(len(ck_set), len(nk_set))
+            if shorter_size == 0:
+                continue
+            score = len(shared) / shorter_size
+            min_shared = 2 if shorter_size >= 3 else 1
+            if len(shared) >= min_shared and score > best_score:
+                best, best_score = nname, score
+        if best and best_score >= 0.6:
+            matches[cohort] = best
+            continue
     return matches
 
 
