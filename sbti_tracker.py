@@ -121,6 +121,40 @@ st.markdown(
 [data-testid="stSidebar"] * { color: #E2E8F0 !important; }
 .v2-Yes { color: #DC2626; font-weight: 700; }
 .v2-No  { color: #16A34A; font-weight: 700; }
+
+/* Big, identifiable top-level tab bar */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 6px;
+    background: #F1F5F9;
+    padding: 8px;
+    border-radius: 12px;
+    margin-bottom: 18px;
+    border: 1px solid #E2E8F0;
+}
+.stTabs [data-baseweb="tab"] {
+    height: 56px;
+    padding: 0 22px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #334155;
+    background: #FFFFFF;
+    border-radius: 8px;
+    border: 1px solid #E2E8F0;
+    transition: all 0.15s ease;
+}
+.stTabs [data-baseweb="tab"]:hover {
+    background: #EFF6FF;
+    color: #1E40AF;
+    border-color: #BFDBFE;
+}
+.stTabs [aria-selected="true"] {
+    background: #1E40AF !important;
+    color: #FFFFFF !important;
+    border-color: #1E40AF !important;
+    box-shadow: 0 2px 6px rgba(30, 64, 175, 0.25);
+}
+.stTabs [data-baseweb="tab-highlight"] { display: none; }
+.stTabs [data-baseweb="tab-border"]    { display: none; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -419,21 +453,25 @@ screen = build_delivery(screen, emissions_cache)
 screen = attach_tpi(screen)
 
 
-# ─── Title (filters render below) ─────────────────────────────────────────────
+# ─── Title + top-level tabs ───────────────────────────────────────────────────
 st.title(f"🇦🇺 Corporate Climate Strategy BD Tracker")
 st.caption(
     "All Australian-listed and large private SBTi companies, plus ASX 200 companies "
-    "without SBTi targets. Use the cohort and ASRS Tier filters to slice."
+    "without SBTi targets. Pick a tab to explore."
 )
 
-# ─── Top filter bar (horizontal) ──────────────────────────────────────────────
+tab_screen, tab_company, tab_insights, tab_askgus, tab_rulebook = st.tabs(
+    ["📊 Cohort", "🔍 Company drill-down", "💡 BD Insights", "🤖 Ask Gus", "📚 Sector rulebook"]
+)
+
+# ─── Filter / KPI / cohort content lives inside the Cohort tab ────────────────
 sectors = sorted([s for s in screen[CANON["sector"]].dropna().unique() if str(s).strip()])
 cohort_options = [c for c in COHORTS.keys() if c in screen["Cohort"].unique()]
 sbti_options = ["Yes", "No"]
 asrs_tiers_present = [t for t in ["Tier 1", "Tier 1 (proxy)", "Tier 2", "Tier 2 (proxy)", "Tier 3", "Unclassified"]
                       if t in screen.get("ASRS Tier", pd.Series(dtype=str)).unique()]
 
-with st.container(border=True):
+with tab_screen, st.container(border=True):
     st.caption("**Filters** — change any to narrow the view; defaults show all companies.")
     fcol1, fcol2, fcol3, fcol4 = st.columns([2, 2, 2, 1])
     with fcol1:
@@ -559,42 +597,36 @@ if f_delivery:
     filtered = filtered[filtered["Delivery RAG"].isin(f_delivery)]
     active_filters.append(f"Delivery RAG: {', '.join(f_delivery)}")
 
-# Active-filter chips + counter
-if active_filters:
-    chip_html = " ".join(
-        f"<span style='display:inline-block; background:#1E40AF22; color:#1E40AF; "
-        f"padding:2px 10px; border-radius:12px; font-size:0.82rem; "
-        f"font-weight:500; margin-right:6px;'>{f}</span>"
-        for f in active_filters
-    )
-    st.markdown(
-        f"**Showing {len(filtered)} of {total_in_cohort} companies**  &nbsp; {chip_html}",
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(
-        f"**Showing all {total_in_cohort} companies in cohort** — no filters active."
-    )
+# ── Chips + KPIs render inside the Cohort tab ─────────────────────────────────
+with tab_screen:
+    if active_filters:
+        chip_html = " ".join(
+            f"<span style='display:inline-block; background:#1E40AF22; color:#1E40AF; "
+            f"padding:2px 10px; border-radius:12px; font-size:0.82rem; "
+            f"font-weight:500; margin-right:6px;'>{f}</span>"
+            for f in active_filters
+        )
+        st.markdown(
+            f"**Showing {len(filtered)} of {total_in_cohort} companies**  &nbsp; {chip_html}",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"**Showing all {total_in_cohort} companies in cohort** — no filters active."
+        )
 
+    total = len(filtered)
+    due_2030 = int((filtered["Target Year (used)"] <= 2030).fillna(False).sum())
+    expired = int((filtered["Years to Target"] < 0).fillna(False).sum())
+    high_priority = int((filtered["V2 Reset Likely"] == "Yes").sum())
+    aligned_15 = int((filtered["CP Alignment"] == "Aligned 1.5°C").sum())
 
-# ─── KPIs ────────────────────────────────────────────────────────────────────
-total = len(filtered)
-due_2030 = int((filtered["Target Year (used)"] <= 2030).fillna(False).sum())
-expired = int((filtered["Years to Target"] < 0).fillna(False).sum())
-high_priority = int((filtered["V2 Reset Likely"] == "Yes").sum())
-aligned_15 = int((filtered["CP Alignment"] == "Aligned 1.5°C").sum())
-
-c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Companies in view", f"{total:,}")
-c2.metric("⏰ Target ≤2030", f"{due_2030:,}")
-c3.metric("⏳ Target year passed", f"{expired:,}")
-c4.metric("🎯 High outreach priority", f"{high_priority:,}")
-c5.metric("✅ Aligned 1.5°C", f"{aligned_15:,}")
-
-
-tab_screen, tab_company, tab_insights, tab_askgus, tab_rulebook = st.tabs(
-    ["Cohort", "Company drill-down", "BD Insights", "Ask Gus 🤖", "Sector rulebook"]
-)
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Companies in view", f"{total:,}")
+    c2.metric("⏰ Target ≤2030", f"{due_2030:,}")
+    c3.metric("⏳ Target year passed", f"{expired:,}")
+    c4.metric("🎯 High outreach priority", f"{high_priority:,}")
+    c5.metric("✅ Aligned 1.5°C", f"{aligned_15:,}")
 
 
 with tab_screen:
