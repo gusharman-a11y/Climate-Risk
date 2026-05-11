@@ -22,42 +22,35 @@ DEFAULT_UA = (
 
 # ─── PDF parsing ─────────────────────────────────────────────────────────────
 
-# Numbers in sustainability reports often have commas, full stops, or spaces
+# Numeric patterns. Sustainability reports use commas, spaces, or full stops
 # as thousands separators. e.g. "12,345" / "12 345" / "12.345" (EU style).
-_NUM = r"(\d{1,3}(?:[,\. \s]\d{3})+|\d+(?:\.\d+)?)"
-_UNIT = r"(?:tco2e?|tco2-?e|t\s*co2-?e|tonnes?\s*co2|kt\s*co2|mt\s*co2|tonnes?)"
+_NUM = r"-?\d{1,3}(?:[,\. ]\d{3})+|-?\d+(?:\.\d+)?"
+_UNIT_RX = re.compile(r"(?:t\s?co2-?e?|tco2-?e?|tonnes?|kt\s?co2-?e?|mt\s?co2-?e?)", re.I)
 
-# Patterns for headline scope figures
-SCOPE_PATTERNS = [
-    (re.compile(rf"scope\s*1[^a-z0-9\n]{{0,80}}{_NUM}\s*{_UNIT}?", re.I), "s1"),
-    (re.compile(rf"scope\s*2[^a-z0-9\n]{{0,80}}{_NUM}\s*{_UNIT}?", re.I), "s2"),
-    (re.compile(rf"scope\s*3[^a-z0-9\n]{{0,80}}{_NUM}\s*{_UNIT}?", re.I), "s3"),
-]
-
-# Reporting year — usually "FY24" or "for the year ended 30 June 2024" or "2024"
 YEAR_PATTERNS = [
     re.compile(r"for the (?:year|financial year)\s+ended\s+(?:\d{1,2}\s+)?(?:[a-z]+\s+)?((?:19|20)\d{2})", re.I),
-    re.compile(r"\bFY\s*(\d{2})\b"),
+    re.compile(r"\b(FY\s?\d{2,4}|CY\s?\d{2,4})\b", re.I),
     re.compile(r"\b((?:19|20)\d{2})\s*sustainability report\b", re.I),
     re.compile(r"\bsustainability report\s+((?:19|20)\d{2})\b", re.I),
+    re.compile(r"\b((?:19|20)\d{2})\s+annual report\b", re.I),
 ]
 
 
-def _to_float(s: str) -> float | None:
-    """Parse '12,345', '12 345', '12.345', '12345.67' to float."""
-    s = s.strip().replace(" ", " ")
-    # If there's a decimal-looking last segment with 1-2 digits, treat as decimal
-    if re.match(r"^\d{1,3}(\.\d{3})+$", s):  # European style 12.345 = 12345
+def _to_float(s):
+    """Parse '12,345' / '12 345' / '12.345' / '12345.67' to float."""
+    if not s:
+        return None
+    s = str(s).strip().replace(",", "").replace(" ", "")
+    if re.match(r"^-?\d{1,3}(\.\d{3})+$", s):
         s = s.replace(".", "")
-    s = s.replace(",", "").replace(" ", "")
     try:
         return float(s)
     except ValueError:
         return None
 
 
-def _normalise_to_tco2e(value: float, unit_hint: str) -> float:
-    u = unit_hint.lower()
+def _normalise_to_tco2e(value, unit_hint):
+    u = (unit_hint or "").lower()
     if "kt" in u:
         return value * 1_000
     if "mt" in u:
@@ -65,54 +58,173 @@ def _normalise_to_tco2e(value: float, unit_hint: str) -> float:
     return value
 
 
-def parse_emissions(pdf_bytes: bytes) -> dict:
+def _extract_year(s):
+    """Extract a 4-digit year from any string ('FY24', '2024', 'CY23')."""
+    if not s:
+        return None
+    m = re.search(r"(19|20)\d{2}", str(s))
+    if m:
+        return int(m.group(0))
+    m = re.search(r"FY\s?(\d{2})", str(s), re.I)
+    if m:
+        return 2000 + int(m.group(1))
+    m = re.search(r"CY\s?(\d{2})", str(s), re.I)
+    if m:
+        return 2000 + int(m.group(1))
+    return None
+
+
+def _row_scope(row):
+    """Identify which scope a table row refers to, if any."""
+    if not row:
+        return None
+    text = " ".join(str(c) for c in row[:3] if c).lower()
+    # Skip rows about targets/baselines/changes — we want absolute emissions
+    if "target" in text or "baseline" in text or "% change" in text or "reduction" in text:
+        return None
+    if re.search(r"\bscope\s*1\b", text) and "total" not in text:
+        if re.search(r"scope\s*1\s*[,&+]|scope\s*1\s*and", text):
+            return None
+        return "s1"
+    if re.search(r"\bscope\s*2\b", text):
+        if "market" in text:
+            return "s2_market"
+        if "location" in text:
+            return "s2_location"
+        return "s2"
+    if re.search(r"\bscope\s*3\b", text):
+        if re.search(r"scope\s*3\s*category\s*\d+", text):
+            return None
+        return "s3"
+    return None
+
+
+def _candidate_from_table(table):
+    """Walk a table looking for Scope 1/2/3 rows with numeric year columns."""
+    if not table or len(table) < 2:
+        return []
+    header_years = []
+    header_idx = -1
+    for i, row in enumerate(table[:4]):
+        years = [_extract_year(c) for c in row]
+        non_none = sum(1 for y in years if y)
+        if non_none >= 2:
+            header_years = years
+            header_idx = i
+            break
+    candidates = []
+    data_rows = table[header_idx + 1:] if header_idx >= 0 else table
+    for row in data_rows:
+        scope = _row_scope(row)
+        if not scope:
+            continue
+        for col_idx, cell in enumerate(row):
+            num = _to_float(str(cell))
+            if num is None or abs(num) < 1:
+                continue
+            year = header_years[col_idx] if 0 <= col_idx < len(header_years) else None
+            candidates.append({
+                "scope": scope, "year": year, "value": num,
+                "row_text": " | ".join(str(c) for c in row if c)[:200],
+            })
+    return candidates
+
+
+def parse_emissions(pdf_bytes):
     """Extract reporting year and Scope 1/2/3 from a sustainability-report PDF.
-    Returns a dict with keys: reporting_year, s1, s2, s3, pages_read, snippets."""
+
+    Strategy:
+      1. Try pdfplumber.extract_tables() on every page — sustainability reports
+         present emissions in multi-year tables. Match Scope 1/2/3 rows against
+         year-headed columns; prefer the latest year. Scope 2 prefers market-based.
+      2. Fall back to regex over the full text for any scope not found in tables.
+
+    Returns reporting_year, s1, s2, s3, pages_read, snippets, all_candidates.
+    """
     try:
         import pdfplumber
     except ImportError:
         return {"error": "pdfplumber not installed"}
 
-    text_chunks: list[str] = []
+    text_chunks = []
+    all_table_candidates = []
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for page in pdf.pages[:160]:
+        for page in pdf.pages[:200]:
             t = page.extract_text() or ""
             text_chunks.append(t)
+            try:
+                tables = page.extract_tables() or []
+            except Exception:
+                tables = []
+            for tbl in tables:
+                all_table_candidates.extend(_candidate_from_table(tbl))
     full = "\n".join(text_chunks)
-    text = full.lower()
 
-    # ── Reporting year ──
-    reporting_year: int | None = None
+    reporting_year = None
     for pat in YEAR_PATTERNS:
         m = pat.search(full)
         if m:
-            v = m.group(1)
-            if len(v) == 2:
-                reporting_year = 2000 + int(v)
-            else:
-                reporting_year = int(v)
-            break
+            reporting_year = _extract_year(m.group(1))
+            if reporting_year:
+                break
 
-    # ── Scope figures ── take the first plausible match per scope.
-    findings: dict[str, float | None] = {"s1": None, "s2": None, "s3": None}
-    snippets: dict[str, str] = {}
-    for pat, key in SCOPE_PATTERNS:
+    findings = {"s1": None, "s2": None, "s3": None}
+    sources = {}
+
+    def _pick(scope_keys):
+        cs = [c for c in all_table_candidates if c["scope"] in scope_keys]
+        if not cs:
+            return None
+        with_year = [c for c in cs if c.get("year")]
+        if with_year:
+            return max(with_year, key=lambda c: (c["year"], c["value"]))
+        return max(cs, key=lambda c: c["value"])
+
+    s1 = _pick(["s1"])
+    if s1:
+        findings["s1"] = s1["value"]
+        sources["s1"] = f"Table (year={s1.get('year') or '?'}): {s1['row_text']}"
+    s2 = _pick(["s2_market"]) or _pick(["s2"]) or _pick(["s2_location"])
+    if s2:
+        findings["s2"] = s2["value"]
+        sources["s2"] = f"Table (year={s2.get('year') or '?'}): {s2['row_text']}"
+    s3 = _pick(["s3"])
+    if s3:
+        findings["s3"] = s3["value"]
+        sources["s3"] = f"Table (year={s3.get('year') or '?'}): {s3['row_text']}"
+
+    # Regex fallback for any scope not yet found
+    text = full.lower()
+    fallback_patterns = [
+        (re.compile(rf"scope\s*1\b[^a-z0-9\n]{{0,60}}({_NUM})", re.I), "s1"),
+        (re.compile(rf"scope\s*2\b[^a-z0-9\n]{{0,60}}({_NUM})", re.I), "s2"),
+        (re.compile(rf"scope\s*3\b[^a-z0-9\n]{{0,60}}({_NUM})", re.I), "s3"),
+    ]
+    for pat, key in fallback_patterns:
+        if findings[key] is not None:
+            continue
         for m in pat.finditer(text):
             num = _to_float(m.group(1))
             if num is None or num < 1:
                 continue
-            unit_hint = m.group(0)[m.end(1) - m.start():] if m.end(1) <= len(m.group(0)) else ""
+            tail = text[m.end():m.end() + 30]
+            unit_hint = ""
+            um = _UNIT_RX.search(tail)
+            if um:
+                unit_hint = um.group(0)
             findings[key] = _normalise_to_tco2e(num, unit_hint)
-            snippets[key] = m.group(0)[:200]
+            sources[key] = f"Regex: {m.group(0)[:160]}"
             break
 
     return {
         "reporting_year": reporting_year,
-        "s1": findings["s1"], "s2": findings["s2"], "s3": findings["s3"],
+        "s1": findings["s1"],
+        "s2": findings["s2"],
+        "s3": findings["s3"],
         "pages_read": len(text_chunks),
-        "snippets": snippets,
+        "snippets": sources,
+        "emissions_candidates": all_table_candidates,
     }
-
 
 # ─── HTTP fetch ──────────────────────────────────────────────────────────────
 

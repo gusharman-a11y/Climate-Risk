@@ -782,9 +782,25 @@ with tab_company:
                 f"Review and save below."
             )
             if parsed_seed.get("snippets"):
-                with st.expander("Show source snippets"):
+                with st.expander("Show source snippets (where each number came from)"):
                     for k, snip in parsed_seed["snippets"].items():
                         st.code(f"{k}: {snip}", language=None)
+            ec = parsed_seed.get("emissions_candidates") or []
+            if ec:
+                with st.expander(
+                    f"All {len(ec)} emissions candidates found in PDF tables "
+                    "(use to verify the auto-pick, or pick a different year)"
+                ):
+                    st.caption(
+                        "Latest year is auto-picked. If the wrong number was chosen "
+                        "(e.g. base year instead of current), copy the right value "
+                        "into the form below."
+                    )
+                    cand_df = pd.DataFrame(ec)[["scope", "year", "value", "row_text"]]
+                    cand_df = cand_df.sort_values(
+                        ["scope", "year"], ascending=[True, False], na_position="last"
+                    )
+                    st.dataframe(cand_df, use_container_width=True, height=300, hide_index=True)
             if parsed_seed.get("all_candidates"):
                 with st.expander(f"Other PDFs found on landing page ({len(parsed_seed['all_candidates'])-1})"):
                     for cand in parsed_seed["all_candidates"][1:]:
