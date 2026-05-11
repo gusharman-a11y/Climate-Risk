@@ -365,5 +365,369 @@
     ],
     "base_year": 2012,
     "base_s12": 32004.0
+  },
+  "EnergyAustralia Holdings Limited": {
+    "company": "EnergyAustralia Holdings Limited",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 16473489.0,
+        "s2": 198921.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.energyaustralia.com.au/sites/default/files/2023-07/Climate%20change%20statement_2.pdf"
+      }
+    ]
+  },
+  "Stanwell Corporation Limited": {
+    "company": "Stanwell Corporation Limited",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 17865749.0,
+        "s2": 52790.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://assets.ctfassets.net/g6959sqmk0wu/65aQQ0IB5Vtms8wTSw2Swc/edabcc0dd9837cdb15470e5c75859ead/Stanwell_Corporation_-_Annual_Report_-_2024-25.pdf"
+      }
+    ]
+  },
+  "Chevron Australia Holdings Pty Ltd": {
+    "company": "Chevron Australia Holdings Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 12928601.0,
+        "s2": 1863.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://australia.chevron.com/our-businesses/gorgon"
+      }
+    ]
+  },
+  "CS Energy Limited": {
+    "company": "CS Energy Limited",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 9200731.0,
+        "s2": 38117.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.csenergy.com.au/about/sustainability"
+      }
+    ]
+  },
+  "Pioneer Sail Holdings Pty Limited": {
+    "company": "Pioneer Sail Holdings Pty Limited",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 10333400.0,
+        "s2": 7149.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://anthropocenefii.org/blog/sembcorp-alinta"
+      }
+    ]
+  },
+  "Alcoa Australian Holdings Pty Ltd": {
+    "company": "Alcoa Australian Holdings Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 5607995.0,
+        "s2": 3203337.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.alcoa.com/sustainability/en/reports"
+      }
+    ]
+  },
+  "Pechiney Consolidated Australia Pty Limited": {
+    "company": "Pechiney Consolidated Australia Pty Limited",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 1159663.0,
+        "s2": 5649626.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.riotinto.com/-/media/Content/Documents/Sustainability/Climate-change/RT-Our-approach-to-climate-change-2024.pdf"
+      }
+    ]
+  },
+  "NRG Victoria I Pty Ltd": {
+    "company": "NRG Victoria I Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 6492467.0,
+        "s2": 46061.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.nrg.com/sustainability.html"
+      }
+    ]
+  },
+  "Inpex Holdings Australia Pty Ltd": {
+    "company": "Inpex Holdings Australia Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 6698961.0,
+        "s2": 619.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.inpex.co.jp/english/csr/sustainability_report.html"
+      }
+    ]
+  },
+  "Sev.En Global Investments Pty Ltd": {
+    "company": "Sev.En Global Investments Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 7056948.0,
+        "s2": 74809.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.7gi.com/"
+      }
+    ]
+  },
+  "Genuity Pty Ltd": {
+    "company": "Genuity Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 5613762.0,
+        "s2": 15890.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://modernslaveryregister.gov.au/statements/aa4lWp6FAApNbL2/pdf/"
+      }
+    ]
+  },
+  "Electricity Generation and Retail Corporation": {
+    "company": "Electricity Generation and Retail Corporation",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 5362016.0,
+        "s2": 10078.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.synergy.net.au/About-us/Sustainability"
+      }
+    ]
+  },
+  "RTA Holdco Australia 5 Pty Ltd": {
+    "company": "RTA Holdco Australia 5 Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 3094142.0,
+        "s2": 555600.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.riotinto.com/en/operations/anz/gladstone"
+      }
+    ]
+  },
+  "Anglo American Australia Limited": {
+    "company": "Anglo American Australia Limited",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 4174693.0,
+        "s2": 632607.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.angloamerican.com/sustainability/environment/climate-change"
+      }
+    ]
+  },
+  "BM Alliance Coal Operations Pty Limited": {
+    "company": "BM Alliance Coal Operations Pty Limited",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 3084445.0,
+        "s2": 821714.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.bhp.com/sustainability/climate-and-energy"
+      }
+    ]
+  },
+  "QGC Upstream Investments Pty Ltd": {
+    "company": "QGC Upstream Investments Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 929217.0,
+        "s2": 2322456.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.shell.com/sustainability/transparency-and-sustainability-reporting/sustainability-reports.html"
+      }
+    ]
+  },
+  "Shell Energy Holdings Australia Limited": {
+    "company": "Shell Energy Holdings Australia Limited",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 2030133.0,
+        "s2": 6280.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.shell.com/sustainability/transparency-and-sustainability-reporting/sustainability-reports.html"
+      }
+    ]
+  },
+  "Peabody Australia Holdco Pty Ltd": {
+    "company": "Peabody Australia Holdco Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 1735165.0,
+        "s2": 165265.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.peabodyenergy.com/Sustainability/ESG-Performance-and-Reporting"
+      }
+    ]
+  },
+  "Coronado Australia Holdings Pty Ltd": {
+    "company": "Coronado Australia Holdings Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 909444.0,
+        "s2": 169352.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://coronadoglobal.com/sustainability/sustainability-reporting/"
+      }
+    ]
+  },
+  "QGC Midstream Investments Pty Ltd": {
+    "company": "QGC Midstream Investments Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 1936241.0,
+        "s2": 0.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.shell.com/sustainability/transparency-and-sustainability-reporting/sustainability-reports.html"
+      }
+    ]
+  },
+  "Bluewaters Power 1 Pty Ltd": {
+    "company": "Bluewaters Power 1 Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 1352311.0,
+        "s2": 900.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.gem.wiki/Bluewaters_power_station"
+      }
+    ]
+  },
+  "Bluewaters Power 2 Pty Ltd": {
+    "company": "Bluewaters Power 2 Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 1238252.0,
+        "s2": 1835.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.gem.wiki/Bluewaters_power_station"
+      }
+    ]
+  },
+  "GLNG Operations Pty Ltd": {
+    "company": "GLNG Operations Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 1645894.0,
+        "s2": 340.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.santos.com/sustainability/climate-and-energy"
+      }
+    ]
+  },
+  "Newgen Kwinana Holdings Pty Ltd": {
+    "company": "Newgen Kwinana Holdings Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 755148.0,
+        "s2": 650.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.climateworkscentre.org/resource/net-zero-momentum-tracker-energy-sector/"
+      }
+    ]
+  },
+  "Banpu Australia Co. Pty Ltd": {
+    "company": "Banpu Australia Co. Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 998465.0,
+        "s2": 206034.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.banpu.com/sustainability/sustainability-reports/"
+      }
+    ]
+  },
+  "QCoal Pty Ltd": {
+    "company": "QCoal Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 914814.0,
+        "s2": 82226.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.qcoal.com.au/"
+      }
+    ]
   }
 }

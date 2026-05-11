@@ -515,11 +515,13 @@ with tab_screen:
     cols_present = [c for c in DISPLAY_COLS if c in filtered.columns]
     table = filtered[cols_present].copy()
 
+    # Tint the Delivery RAG cell so the cohort table reads at a glance.
     def _row_style(row):
-        colour = V2_COLOUR.get(row["V2 Reset Likely"], "#FFFFFF")
+        rag = row.get("Delivery RAG", "")
+        colour = DELIVERY_COLOUR.get(rag, "#FFFFFF")
         return [
             f"background-color: {colour}22; color: {colour}; font-weight: 600"
-            if c == "V2 Reset Likely" else "" for c in row.index
+            if c == "Delivery RAG" else "" for c in row.index
         ]
 
     styler = table.style.apply(_row_style, axis=1)
