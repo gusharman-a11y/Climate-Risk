@@ -295,9 +295,9 @@ def filter_asx(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def filter_au_private(df: pd.DataFrame) -> pd.DataFrame:
-    """Other Australian large-corporate / financial-institution SBTi entries —
-    everything that's Australian and Corporate/FI but not in the ASX cohort.
-    Excludes SMEs."""
+    """Other Australian SBTi entries — Corporate, Financial Institution, or
+    SME — that aren't in the ASX cohort. ASRS/AASB S2 tier filtering happens
+    downstream via the asrs_tier function (Tier 1 / 2 / 3)."""
     if df.empty:
         return df
     country = df[CANON["country"]].astype(str).str.strip().str.lower()
@@ -306,8 +306,8 @@ def filter_au_private(df: pd.DataFrame) -> pd.DataFrame:
     org = df[CANON["org_type"]].astype(str).str.strip().str.lower()
     in_asx = country.eq("australia") & (isin.str.startswith("AU") | company.isin(ASX_ALLOWLIST))
     is_au = country.eq("australia")
-    is_large = org.isin({"corporate", "financial institution"})
-    return df[is_au & ~in_asx & is_large].copy()
+    has_org = org.isin({"corporate", "financial institution", "sme"})
+    return df[is_au & ~in_asx & has_org].copy()
 
 
 COHORTS = {
