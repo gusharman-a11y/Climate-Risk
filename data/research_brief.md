@@ -2,87 +2,125 @@
 
 This is the working list for the **external research workflow** (ChatGPT or Claude.ai with web search). The Claude Code session that built this tracker can't fetch the web — that's why we're outsourcing the research.
 
-## What's already verified — DON'T research these
+## Important context for whoever's running the research
 
-The cohort has 524 companies total. **128 already have credible target data and should be skipped:**
+The tracker **already has the SBTi public dataset loaded** from sciencebasedtargets.org/companies-taking-action. So for any SBTi company, we already know:
 
-- **All SBTi-validated** companies (Near-term Status = "Targets set"). The SBTi public dataset is the authoritative source — no value re-researching them.
-- **17 companies** verified via this workflow already (in `data/climate_targets_research.csv`): Appen, ASX Ltd, Australian Ethical, Downer EDI, Flight Centre, Fortescue, Inghams, Metrics Credit, nib, Stockland, Vicinity, Woodside, Glencore Holdings, Cleanaway, Stanmore, Coronado, SGH.
-- **High-confidence training-data ASX 200 non-SBTi** (CBA, Westpac, NAB, ANZ, Macquarie, BHP, Rio, Santos, Wesfarmers, AGL, GPT, Amcor, BlueScope, Treasury Wine, ResMed etc.) — already documented well enough that the Confidence flag is "High" in `data/asx200_non_sbti.csv`.
+- Target wording (the full sentence)
+- Validation status (Targets Set / Committed / Commitment Removed)
+- Target year, base year (when present in SBTi data)
+- Net-zero year (when present)
+- Date committed / date updated
 
-## What needs research — 396 companies, prioritised
+**Don't waste ChatGPT context restating what SBTi already provides.** The research needs to add **what SBTi doesn't already give us** — namely current company-disclosed detail from their own FY24/FY25 reports.
 
-**`data/research_backlog.csv`** has the full list with priority scores. Headline counts:
+---
 
-| Bucket | Count | Priority | Notes |
-|---|---|---|---|
-| **Aus Corporate / FI (SBTi private), Commitment Removed** | 17 | 75 | Private firms whose SBTi commitment was withdrawn — likely have a current internal target |
-| **Aus Corporate / FI (SBTi private), Committed only** | 23 | 70 | SBTi intent letter submitted but not yet validated |
-| **ASX 200 non-SBTi** (Low/Medium-confidence training data) | 57 | 60 | My training-data classifications were uncertain; verify or upgrade |
-| **NGER-only** (no overlay yet) | 299 | scaled by Scope 1 | Big direct emitters; foreign subsidiaries, state utilities, private mining/power |
+## Updated prompt — paste into ChatGPT
 
-**Note:** All 11 high-priority ASX-listed SBTi cohort entries (Fortescue, Vicinity, Stockland etc.) are now done — they're not in the backlog.
-
-## Workflow per batch
-
-1. Open ChatGPT or claude.ai (whichever has live web search you prefer)
-2. Paste the prompt below
-3. Append 30–50 company names from `data/research_backlog.csv` (top of the file = highest priority)
-4. The chatbot returns a CSV in a code fence
-5. Append the CSV to `data/climate_targets_research.csv` via GitHub web upload (commits append; existing rows aren't overwritten unless duplicate)
-6. Streamlit auto-redeploys — researched targets override training-data values across all cohorts
-
-## Prompt to use
-
-> I need current climate targets for the Australian companies listed below. Search the web with strong preference for **FY24 or FY25 sources** (sustainability reports, annual reports, climate transition plans published in 2024 or 2025). Don't use older sources unless nothing newer exists.
+> Australia-listed companies. The user already has the SBTi public dataset (sciencebasedtargets.org/companies-taking-action), so they know each company's SBTi status, target wording, and target/base/net-zero years from SBTi itself.
 >
-> Return one CSV row per company inside a single ```csv``` code fence with these columns (use commas; double-quote any field containing a comma):
+> What the user needs you to research from **each company's own FY24 or FY25 sustainability/climate/annual reports** (not from SBTi):
 >
-> `Company Name,Stated Target Description,Stated Target Year,Stated Net-Zero Year,Target Classification,Source URL,Confidence,Notes`
+> 1. **Latest reported Scope 1 and Scope 2 emissions** (most recent year)
+> 2. **Base-year Scope 1+2 emissions** (the absolute tCO2e they're measuring against)
+> 3. **Reduction achieved to date** — % below baseline at most recent reporting year
+> 4. **Scope 3 status** — is there a Scope 3 target? What categories? What % reduction by when?
+> 5. **Any changes/updates since SBTi snapshot** — e.g. did they recently remove a commitment, push a target back, raise ambition, achieve a milestone?
+> 6. **Validation date / removal reason** — exact month/year if known
+> 7. **BD-relevant signals** — sustainability-linked loans, climate transition plans rejected by shareholders, recent restatements, methodology changes, regulatory issues
 >
-> **Target Classification** must be one of: `SBTi committed` | `Quantitative non-validated` | `Net-zero only` | `Aspirational` | `No public target`
+> Search FY24 / FY25 sources (sustainability reports, climate transition action plans, annual reports published 2024 or 2025). Don't use older sources unless nothing newer exists. Skip the SBTi public dashboard — the user has it.
 >
-> **Confidence** — `High` / `Medium` / `Low`.
+> Return one CSV row per company inside a single ```csv``` code fence:
 >
-> **Stated Target Description** — 1–2 sentences with headline number, base year, target year. Don't restate company background.
+> `Company Name,Latest Reported Year,Latest S1 (tCO2e),Latest S2 (tCO2e),Base Year,Base S1+S2 (tCO2e),% Reduction Achieved,Scope 3 Status,Recent Update Since SBTi Snapshot,BD Signals,Source URL,Confidence`
 >
-> **Source URL** — the actual sustainability/climate report URL, not the homepage.
+> **Confidence** = `High` / `Medium` / `Low` based on how clearly each field is documented in a recent primary source.
+>
+> If a value isn't clearly disclosed in the primary source, leave the cell empty rather than guessing. Use Confidence = Low for rows where multiple cells are empty.
 >
 > Output only the CSV in one code fence, no prose between rows.
+>
+> Here are the companies:
+>
+> [PASTE COMPANY NAMES HERE]
 
-## Suggested first batch — top 30 from the new backlog
+---
+
+## What you actually need to look for in the CSV ChatGPT returns
+
+Compared to before:
+
+| Old prompt fields | New prompt fields |
+|---|---|
+| Stated Target Description (duplicates SBTi) | **Latest Reported Year + S1 + S2** (NEW — what SBTi doesn't have) |
+| Stated Target Year (in SBTi) | **Base Year + Base S1+S2 (tCO2e)** (NEW — absolute numbers) |
+| Stated Net-Zero Year (in SBTi) | **% Reduction Achieved** (NEW — progress not target) |
+| Target Classification (we derive) | **Scope 3 Status** (NEW — detail SBTi rarely has) |
+| Source URL ✓ | **Recent Update Since SBTi Snapshot** (NEW — change signal) |
+| Confidence ✓ | **BD Signals** (NEW — qualitative context) |
+| Notes ✓ | **Source URL + Confidence** ✓ |
+
+The new CSV plugs **directly into the emissions cache** — Latest S1/S2 numbers populate the trajectory math (Required Reduction vs Actual), Base S1+S2 enables the gap-to-path calculation, and Scope 3 Status / Recent Update / BD Signals all surface in the company drill-down.
+
+This is genuinely additive over SBTi rather than redundant.
+
+---
+
+## Remaining companies to research (102 SBTi + ~340 non-SBTi)
+
+Priority order — see `data/research_backlog.csv` for the full ranked list.
+
+**Next batch (Batch 3, 36 companies — first half of Australian private SBTi cohort):**
 
 ```
-The Arnotts Group
-South East Water
-Teachers Mutual Bank
-SMEC ANZ
-Intrepid Travel
-B2R Local No.1 Pty Ltd
-IPEC Pty Ltd (Team Global Express)
-Icon Construction
-Cement Australia Pty Ltd
-Consolidated Property Services (Australia) Pty Ltd
-BAI Communications Pty Ltd
-Airmaster Corporation Pty Ltd
-SECURECORP Pty Ltd
-Yarra Valley Water
-Partners in Performance
-Nando's Australia Pty Ltd
+APOG Topco Pty Ltd
 Accolade Wines
-NEXTDC
-Scentre Group
-Spark New Zealand
-Orica
-Fisher & Paykel Healthcare
-TechnologyOne
-Charter Hall Group
-IGO Limited
-Viva Energy Group
-Ampol
-Endeavour Group
-Metcash
-Worley
+Airmaster Corporation Pty Ltd
+Allens
+Alsco Uniforms
+Ausgrid Group
+Australian Broadcasting Corporation
+Australian Postal Corporation
+B2R Local No.1 Pty Ltd
+BAI Communications Pty Ltd
+BDO Group Holdings Limited
+BIC Consolidated
+Baiada Pty Ltd
+Bank Australia
+Bundaberg Sugar Ltd
+CURA Day Hospitals Group Pty Ltd
+CyberCX Pty Ltd
+Campus Living Villages
+Cement Australia Pty Ltd
+Cirka
+Compnow
+Consolidated Property Services (Australia) Pty Ltd
+Culture Amp
+Edge Environment Pty Ltd
+Erilyan Group Pty Ltd
+FDC Group Holdings Pty Ltd
+Frasers Property Australia
+Fitness Passport
+Frasers Property Industrial
+GHD Group Limited
+GeelongPort
+Glad Group
+Great Southern Bank
+Grosvenor Engineering Group Pty Ltd
+HSK Ward Group Pty Ltd
+Hall & Wilcox
 ```
 
-After this batch, take the top 30 NGER-only entries from the backlog file (sorted by priority desc) — they're the largest emitters in that cohort.
+**Heads-up on private companies:** many of these are professional services firms (Allens, Hall & Wilcox, KWM, BDO, GHD), SMEs (BIC, Cirka, Compnow), or government entities (NBN, ABC, Australia Post, water utilities). Expect a higher hit rate of "No public target" / "Aspirational" — their direct emissions are small and few publish detailed climate reports. That's a useful BD signal itself though — they're SBTi-committed but lacking implementation infrastructure.
+
+## When ChatGPT returns CSV
+
+Paste back here. I'll:
+
+1. Validate columns
+2. Append/replace in the right cache files:
+   - **Emissions** (Latest S1/S2/Base) → `data/emissions_cache.json` (populates trajectory math)
+   - **Target metadata** (Scope 3, Recent Update, BD Signals) → new file `data/sbti_target_metadata.csv`
+3. Commit and confirm coverage
