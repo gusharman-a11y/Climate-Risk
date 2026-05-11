@@ -45,6 +45,8 @@ from modules.nger import (
     load_nger,
 )
 from modules.tpi import MQ_COLOUR, CP_COLOUR, attach_tpi
+from modules.bd_insights import INSIGHTS
+from modules.ask_gus import build_context, get_client, stream_answer
 
 
 def _column_config():
@@ -590,8 +592,8 @@ c4.metric("🎯 High outreach priority", f"{high_priority:,}")
 c5.metric("✅ Aligned 1.5°C", f"{aligned_15:,}")
 
 
-tab_screen, tab_company, tab_rulebook = st.tabs(
-    ["Cohort", "Company drill-down", "Sector rulebook"]
+tab_screen, tab_company, tab_insights, tab_askgus, tab_rulebook = st.tabs(
+    ["Cohort", "Company drill-down", "BD Insights", "Ask Gus 🤖", "Sector rulebook"]
 )
 
 
@@ -931,6 +933,127 @@ with tab_company:
                     )
                     save_cache(emissions_cache)
                     st.success(f"Saved {company} {int(rep_year)} emissions. Reload to refresh the cohort table.")
+
+
+with tab_insights:
+    st.markdown("### BD Insights — pre-canned strategic cuts")
+    st.caption(
+        "Hand-curated views on where Pollination's advisory wedge is widest. "
+        "Each insight applies to the **full cohort** (top filters above don't change these)."
+    )
+    insight_choice = st.selectbox(
+        "Pick an insight",
+        list(INSIGHTS.keys()),
+        key="bd_insight_pick",
+    )
+    insight_fn = INSIGHTS[insight_choice]
+    try:
+        out = insight_fn(screen)
+    except Exception as exc:
+        st.error(f"Insight failed: {exc}")
+        out = None
+    if out:
+        st.markdown(f"#### {out['title']}")
+        st.info(out["summary"])
+        tbl = out.get("table")
+        if tbl is not None and not tbl.empty:
+            st.dataframe(
+                tbl, use_container_width=True, hide_index=True,
+                column_config=_column_config(), height=520,
+            )
+            if out.get("table_caption"):
+                st.caption(out["table_caption"])
+            st.download_button(
+                f"⬇ Download — {insight_choice} (CSV)",
+                tbl.to_csv(index=False).encode("utf-8"),
+                file_name=f"insight_{insight_choice.lower().replace(' ', '_')}.csv",
+                mime="text/csv",
+            )
+        else:
+            st.caption("(No rows matched this insight in the current cohort.)")
+
+
+with tab_askgus:
+    st.markdown("### Ask Gus 🤖")
+    st.caption(
+        "Live AI Q&A over the cohort. Gus is briefed on every company, their SBTi "
+        "status, delivery gaps, and recent BD signals. Ask anything — *who should "
+        "I target this quarter*, *what's the wedge on Stanwell*, *which retailers "
+        "are credible on Scope 3*."
+    )
+
+    client = get_client()
+    if client is None:
+        st.warning(
+            "**API key not configured.** Add an Anthropic API key to enable Ask Gus.\n\n"
+            "On Streamlit Cloud: open your app → Settings → Secrets, and paste:\n"
+        )
+        st.code(
+            '[anthropic]\napi_key = "sk-ant-..."',
+            language="toml",
+        )
+        st.caption(
+            "Get a key at console.anthropic.com. Locally, you can instead "
+            "`export ANTHROPIC_API_KEY=sk-ant-...` before running Streamlit."
+        )
+    else:
+        if "askgus_history" not in st.session_state:
+            st.session_state.askgus_history = []
+        if "askgus_context" not in st.session_state or st.session_state.get("askgus_n") != len(screen):
+            st.session_state.askgus_context = build_context(screen)
+            st.session_state.askgus_n = len(screen)
+
+        # Replay prior turns
+        for msg in st.session_state.askgus_history:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        # Quick-start suggestions when the conversation is fresh
+        if not st.session_state.askgus_history:
+            st.markdown("**Try one of these to start:**")
+            qcol1, qcol2, qcol3 = st.columns(3)
+            suggestions = [
+                ("Top 5 BD targets this quarter and why",
+                 "Who are the top 5 BD targets I should chase this quarter, and what's the wedge for each?"),
+                ("Which utilities are credibility-exposed?",
+                 "Which Australian utilities have the biggest credibility gap between their public climate position and what they're actually delivering?"),
+                ("Where's the Scope 3 opportunity?",
+                 "Where's the biggest Scope 3 advisory opportunity in this cohort — which companies have committed but don't have a credible plan?"),
+            ]
+            for col, (label, q) in zip((qcol1, qcol2, qcol3), suggestions):
+                if col.button(label, key=f"suggest_{label[:10]}", use_container_width=True):
+                    st.session_state.askgus_pending = q
+
+        prompt = st.chat_input("Ask Gus a question…")
+        pending = st.session_state.pop("askgus_pending", None) if "askgus_pending" in st.session_state else None
+        question = prompt or pending
+
+        if question:
+            st.session_state.askgus_history.append({"role": "user", "content": question})
+            with st.chat_message("user"):
+                st.markdown(question)
+            with st.chat_message("assistant"):
+                placeholder = st.empty()
+                buf = ""
+                try:
+                    for delta in stream_answer(
+                        client,
+                        st.session_state.askgus_context,
+                        st.session_state.askgus_history[:-1],
+                        question,
+                    ):
+                        buf += delta
+                        placeholder.markdown(buf + "▌")
+                    placeholder.markdown(buf)
+                except Exception as exc:
+                    placeholder.error(f"Claude request failed: {exc}")
+                    buf = f"_Error: {exc}_"
+            st.session_state.askgus_history.append({"role": "assistant", "content": buf})
+
+        if st.session_state.askgus_history:
+            if st.button("🗑 Clear conversation", key="askgus_clear"):
+                st.session_state.askgus_history = []
+                st.rerun()
 
 
 with tab_rulebook:
