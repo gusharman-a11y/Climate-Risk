@@ -15,6 +15,7 @@ import pandas as pd
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 RESEARCH_CSV = DATA_DIR / "climate_targets_research.csv"
+METADATA_CSV = DATA_DIR / "sbti_target_metadata.csv"
 
 
 def _name_key(name: str) -> str:
@@ -62,49 +63,87 @@ def _clean_classification(v) -> str:
     return s
 
 
+def load_metadata() -> pd.DataFrame:
+    """Read data/sbti_target_metadata.csv (qualitative companion file from
+    the new prompt schema: Latest S1/S2, Scope 3 Status, Recent Update,
+    BD Signals). Returns empty df if file missing."""
+    if not METADATA_CSV.exists():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(METADATA_CSV)
+        df.columns = [c.strip() for c in df.columns]
+        df["_key"] = df["Company Name"].apply(_name_key)
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
 def apply_overlay(df: pd.DataFrame) -> pd.DataFrame:
     """For each row in df whose Company Name matches a researched entry,
     override Target / Target Year / Net-Zero Year / Target Classification /
-    plus add Research-prefixed columns for traceability (Confidence, URL, Notes)."""
+    plus add Research-prefixed columns for traceability (Confidence, URL,
+    Notes, Scope 3 Status, Recent Update, BD Signals)."""
     if df.empty:
-        return df
-    overlay = load_researched()
-    if overlay.empty:
-        df["Researched"] = False
         return df
 
     work = df.copy()
     work["_key"] = work["Company Name"].apply(_name_key)
-    overlay_indexed = overlay.set_index("_key")
 
     # Default columns
     work["Researched"] = False
     work["Research Confidence"] = ""
     work["Research Source URL"] = ""
     work["Research Notes"] = ""
+    work["Scope 3 Status"] = ""
+    work["Recent Update"] = ""
+    work["BD Signals"] = ""
 
-    for idx, row in work.iterrows():
-        key = row["_key"]
-        if not key or key not in overlay_indexed.index:
-            continue
-        ovl = overlay_indexed.loc[key]
-        if isinstance(ovl, pd.DataFrame):
-            ovl = ovl.iloc[0]
-        # Override target fields
-        work.at[idx, "Target"] = str(ovl.get("Stated Target Description", "")).strip()
-        ty = _coerce_year(ovl.get("Stated Target Year"))
-        nz = _coerce_year(ovl.get("Stated Net-Zero Year"))
-        if ty is not pd.NA:
-            work.at[idx, "Target Year"] = ty
-        if nz is not pd.NA:
-            work.at[idx, "Net-Zero Year"] = nz
-        cls = _clean_classification(ovl.get("Target Classification", ""))
-        if cls:
-            work.at[idx, "Target Classification"] = cls
-            work.at[idx, "Target Classification (Long)"] = cls
-        work.at[idx, "Researched"] = True
-        work.at[idx, "Research Confidence"] = str(ovl.get("Confidence", "")).strip()
-        work.at[idx, "Research Source URL"] = str(ovl.get("Source URL", "")).strip()
-        work.at[idx, "Research Notes"] = str(ovl.get("Notes", "")).strip()
+    # 1) Apply the primary research file (target classification)
+    overlay = load_researched()
+    if not overlay.empty:
+        overlay_indexed = overlay.set_index("_key")
+        for idx, row in work.iterrows():
+            key = row["_key"]
+            if not key or key not in overlay_indexed.index:
+                continue
+            ovl = overlay_indexed.loc[key]
+            if isinstance(ovl, pd.DataFrame):
+                ovl = ovl.iloc[0]
+            work.at[idx, "Target"] = str(ovl.get("Stated Target Description", "")).strip()
+            ty = _coerce_year(ovl.get("Stated Target Year"))
+            nz = _coerce_year(ovl.get("Stated Net-Zero Year"))
+            if ty is not pd.NA:
+                work.at[idx, "Target Year"] = ty
+            if nz is not pd.NA:
+                work.at[idx, "Net-Zero Year"] = nz
+            cls = _clean_classification(ovl.get("Target Classification", ""))
+            if cls:
+                work.at[idx, "Target Classification"] = cls
+                work.at[idx, "Target Classification (Long)"] = cls
+            work.at[idx, "Researched"] = True
+            work.at[idx, "Research Confidence"] = str(ovl.get("Confidence", "")).strip()
+            work.at[idx, "Research Source URL"] = str(ovl.get("Source URL", "")).strip()
+            work.at[idx, "Research Notes"] = str(ovl.get("Notes", "")).strip()
+
+    # 2) Apply the metadata file (qualitative BD signals)
+    meta = load_metadata()
+    if not meta.empty:
+        meta_indexed = meta.set_index("_key")
+        for idx, row in work.iterrows():
+            key = row["_key"]
+            if not key or key not in meta_indexed.index:
+                continue
+            m = meta_indexed.loc[key]
+            if isinstance(m, pd.DataFrame):
+                m = m.iloc[0]
+            work.at[idx, "Researched"] = True
+            work.at[idx, "Scope 3 Status"] = str(m.get("Scope 3 Status", "")).strip()
+            work.at[idx, "Recent Update"] = str(m.get("Recent Update", "")).strip()
+            work.at[idx, "BD Signals"] = str(m.get("BD Signals", "")).strip()
+            # Only fill confidence / URL / notes if the primary file didn't
+            if not work.at[idx, "Research Confidence"]:
+                work.at[idx, "Research Confidence"] = str(m.get("Confidence", "")).strip()
+            if not work.at[idx, "Research Source URL"]:
+                work.at[idx, "Research Source URL"] = str(m.get("Source URL", "")).strip()
 
     return work.drop(columns=["_key"])
