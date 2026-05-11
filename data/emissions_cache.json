@@ -5,7 +5,15 @@
     "base_year": 2019,
     "base_s12": 2900000,
     "history": [
-      {"year": 2024, "s1": 2350000, "s2": 220000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "medium"}
+      {
+        "year": 2024,
+        "s1": 2350000,
+        "s2": 220000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "medium"
+      }
     ]
   },
   "AU000000COL6": {
@@ -14,7 +22,15 @@
     "base_year": 2020,
     "base_s12": 940000,
     "history": [
-      {"year": 2024, "s1": 165000, "s2": 630000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "high"}
+      {
+        "year": 2024,
+        "s1": 165000,
+        "s2": 630000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "high"
+      }
     ]
   },
   "AU000000WOW2": {
@@ -23,7 +39,15 @@
     "base_year": 2015,
     "base_s12": 2470000,
     "history": [
-      {"year": 2024, "s1": 280000, "s2": 1330000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "high"}
+      {
+        "year": 2024,
+        "s1": 280000,
+        "s2": 1330000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "high"
+      }
     ]
   },
   "AU000000TLS2": {
@@ -32,7 +56,15 @@
     "base_year": 2019,
     "base_s12": 367000,
     "history": [
-      {"year": 2024, "s1": 56000, "s2": 224000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "high"}
+      {
+        "year": 2024,
+        "s1": 56000,
+        "s2": 224000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "high"
+      }
     ]
   },
   "AU000000ORG5": {
@@ -41,7 +73,15 @@
     "base_year": 2017,
     "base_s12": 14400000,
     "history": [
-      {"year": 2024, "s1": 11600000, "s2": 30000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "high"}
+      {
+        "year": 2024,
+        "s1": 11600000,
+        "s2": 30000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "high"
+      }
     ]
   },
   "AU000000CSL8": {
@@ -50,7 +90,15 @@
     "base_year": 2018,
     "base_s12": 295000,
     "history": [
-      {"year": 2024, "s1": 142000, "s2": 121000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "high"}
+      {
+        "year": 2024,
+        "s1": 142000,
+        "s2": 121000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "high"
+      }
     ]
   },
   "AU000000BXB1": {
@@ -59,7 +107,15 @@
     "base_year": 2020,
     "base_s12": 230000,
     "history": [
-      {"year": 2024, "s1": 142000, "s2": 38000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "high"}
+      {
+        "year": 2024,
+        "s1": 142000,
+        "s2": 38000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "high"
+      }
     ]
   },
   "AU000000ANN9": {
@@ -68,7 +124,15 @@
     "base_year": 2019,
     "base_s12": 215000,
     "history": [
-      {"year": 2024, "s1": 65000, "s2": 130000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "medium"}
+      {
+        "year": 2024,
+        "s1": 65000,
+        "s2": 130000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "medium"
+      }
     ]
   },
   "AU000000DXS1": {
@@ -77,7 +141,15 @@
     "base_year": 2018,
     "base_s12": 110000,
     "history": [
-      {"year": 2024, "s1": 7000, "s2": 22000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "medium"}
+      {
+        "year": 2024,
+        "s1": 7000,
+        "s2": 22000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "medium"
+      }
     ]
   },
   "AU000000GMG2": {
@@ -86,7 +158,15 @@
     "base_year": 2020,
     "base_s12": 30000,
     "history": [
-      {"year": 2024, "s1": 5000, "s2": 18000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "medium"}
+      {
+        "year": 2024,
+        "s1": 5000,
+        "s2": 18000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "medium"
+      }
     ]
   },
   "AU000000MGR9": {
@@ -95,7 +175,15 @@
     "base_year": 2020,
     "base_s12": 65000,
     "history": [
-      {"year": 2024, "s1": 5000, "s2": 35000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "medium"}
+      {
+        "year": 2024,
+        "s1": 5000,
+        "s2": 35000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "medium"
+      }
     ]
   },
   "AU000000SGP0": {
@@ -104,7 +192,15 @@
     "base_year": 2020,
     "base_s12": 55000,
     "history": [
-      {"year": 2024, "s1": 5000, "s2": 30000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "medium"}
+      {
+        "year": 2024,
+        "s1": 5000,
+        "s2": 30000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "medium"
+      }
     ]
   },
   "AU000000LLC3": {
@@ -113,7 +209,15 @@
     "base_year": 2020,
     "base_s12": 75000,
     "history": [
-      {"year": 2024, "s1": 14000, "s2": 35000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "medium"}
+      {
+        "year": 2024,
+        "s1": 14000,
+        "s2": 35000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "medium"
+      }
     ]
   },
   "AU000000BEN6": {
@@ -122,7 +226,15 @@
     "base_year": 2018,
     "base_s12": 12000,
     "history": [
-      {"year": 2024, "s1": 1500, "s2": 7500, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "medium"}
+      {
+        "year": 2024,
+        "s1": 1500,
+        "s2": 7500,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "medium"
+      }
     ]
   },
   "AU000000RHC8": {
@@ -131,7 +243,15 @@
     "base_year": 2020,
     "base_s12": 175000,
     "history": [
-      {"year": 2024, "s1": 50000, "s2": 105000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "medium"}
+      {
+        "year": 2024,
+        "s1": 50000,
+        "s2": 105000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "medium"
+      }
     ]
   },
   "AU000000TCL6": {
@@ -140,7 +260,15 @@
     "base_year": 2020,
     "base_s12": 70000,
     "history": [
-      {"year": 2024, "s1": 5000, "s2": 50000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "medium"}
+      {
+        "year": 2024,
+        "s1": 5000,
+        "s2": 50000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "medium"
+      }
     ]
   },
   "AU000000COH5": {
@@ -149,7 +277,29 @@
     "base_year": 2020,
     "base_s12": 940000,
     "history": [
-      {"year": 2024, "s1": 165000, "s2": 630000, "s3": null, "source": "training-knowledge", "source_url": "", "confidence": "high"}
+      {
+        "year": 2024,
+        "s1": 165000,
+        "s2": 630000,
+        "s3": null,
+        "source": "training-knowledge",
+        "source_url": "",
+        "confidence": "high"
+      }
+    ]
+  },
+  "Mahindra Automotive Australia Pty Ltd": {
+    "company": "Mahindra Automotive Australia Pty Ltd",
+    "isin": "",
+    "history": [
+      {
+        "year": 2023,
+        "s1": 750.0,
+        "s2": 1500.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://ditchcarbon.com/organizations/mahindra-automotive-australia-pty"
+      }
     ]
   }
 }
