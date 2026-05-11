@@ -113,9 +113,24 @@ def apply_overlay(df: pd.DataFrame) -> pd.DataFrame:
             ty = _coerce_year(ovl.get("Stated Target Year"))
             nz = _coerce_year(ovl.get("Stated Net-Zero Year"))
             if ty is not pd.NA:
+                # Write to both the raw Target Year (SBTi column) and the
+                # computed Target Year (used) — the latter is what shows in the
+                # cohort table and feeds the trajectory math.
                 work.at[idx, "Target Year"] = ty
+                work.at[idx, "Target Year (used)"] = ty
+                work.at[idx, "Year Source"] = "researched (near-term)"
+                # Refresh Years to Target so the column matches the new year
+                import datetime as _dt
+                work.at[idx, "Years to Target"] = int(ty) - _dt.datetime.utcnow().year
             if nz is not pd.NA:
                 work.at[idx, "Net-Zero Year"] = nz
+            # If only net-zero year is set (no near-term), fall back to that
+            # for the displayed Target Year (used) and tag the source.
+            if ty is pd.NA and nz is not pd.NA and pd.isna(work.at[idx, "Target Year (used)"]):
+                work.at[idx, "Target Year (used)"] = nz
+                work.at[idx, "Year Source"] = "researched (net-zero)"
+                import datetime as _dt
+                work.at[idx, "Years to Target"] = int(nz) - _dt.datetime.utcnow().year
             cls = _clean_classification(ovl.get("Target Classification", ""))
             if cls:
                 work.at[idx, "Target Classification"] = cls
