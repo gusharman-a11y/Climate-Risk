@@ -206,6 +206,81 @@ with st.sidebar.expander("📊 Reported emissions", expanded=False):
     )
 
     st.markdown("---")
+    st.markdown("**📚 Bulk PDF upload**")
+    st.caption(
+        "Drop up to 10 sustainability-report PDFs. Each one is parsed for "
+        "Scope 1/2/3 + reporting year, then matched to a cohort company by "
+        "filename or auto-detection. Review the results table before saving."
+    )
+    bulk_pdfs = st.file_uploader(
+        "PDFs (multiple)",
+        type=["pdf"],
+        accept_multiple_files=True,
+        key="bulk_pdf_upload",
+        help="Name files after the company (e.g. 'BHP_FY24.pdf') for auto-matching.",
+    )
+    if bulk_pdfs:
+        from modules.researched import _name_key as _nk
+        cohort_names = list(screen[CANON["company"]].dropna().unique())
+        cohort_key_map = {_nk(n): n for n in cohort_names}
+
+        st.markdown(f"**{len(bulk_pdfs)} PDF(s) ready to parse:**")
+        results = []
+        prog = st.progress(0.0)
+        for i, f in enumerate(bulk_pdfs, start=1):
+            prog.progress(i / len(bulk_pdfs), text=f"{i}/{len(bulk_pdfs)} {f.name}")
+            try:
+                parsed = parse_emissions(f.getvalue())
+            except Exception as exc:
+                results.append({"File": f.name, "Match": "ERROR", "Year": "",
+                    "S1": "", "S2": "", "S3": "", "Error": str(exc)[:60]})
+                continue
+            stem = f.name.rsplit(".", 1)[0]
+            stem_key = _nk(stem)
+            best_match = None
+            for k, n in cohort_key_map.items():
+                if not k or not stem_key:
+                    continue
+                if k == stem_key or k in stem_key or stem_key in k:
+                    best_match = n
+                    break
+            results.append({
+                "File": f.name,
+                "Match": best_match or "— pick below —",
+                "Year": parsed.get("reporting_year") or "",
+                "S1": parsed.get("s1") or "",
+                "S2": parsed.get("s2") or "",
+                "S3": parsed.get("s3") or "",
+            })
+        st.dataframe(pd.DataFrame(results), use_container_width=True, hide_index=True)
+
+        if st.button("💾 Save all matched rows to emissions cache", key="bulk_save"):
+            saved = 0
+            for f, r in zip(bulk_pdfs, results):
+                if r.get("Match", "").startswith("—") or not r.get("Year"):
+                    continue
+                try:
+                    yr = int(r["Year"])
+                except (TypeError, ValueError):
+                    continue
+                key = r["Match"]
+                rec = emissions_cache.get(key, {"company": key, "isin": "", "history": []})
+                rec["history"] = [h for h in rec["history"] if h.get("year") != yr]
+                rec["history"].append({
+                    "year": yr,
+                    "s1": float(r["S1"]) if r.get("S1") else None,
+                    "s2": float(r["S2"]) if r.get("S2") else None,
+                    "s3": float(r["S3"]) if r.get("S3") else None,
+                    "source": "bulk-pdf-upload",
+                    "source_url": f.name,
+                })
+                emissions_cache[key] = rec
+                saved += 1
+            save_cache(emissions_cache)
+            st.success(f"Saved {saved} of {len(bulk_pdfs)} to emissions cache. "
+                       "Reload page to refresh the cohort table.")
+
+    st.markdown("---")
     st.markdown("**🇦🇺 NGER bulk import**")
     st.caption(
         "Upload the **Corporate emissions and energy data** spreadsheet from "
