@@ -411,19 +411,22 @@ def build_screen(df: pd.DataFrame, cohort: str = "ASX listed (SBTi)") -> pd.Data
 # so we presume scope coverage was deemed adequate at validation time. The
 # scope analysis still runs internally and feeds the V2 Reset flag.
 
-# Note: ISIN intentionally omitted from default display — not useful for BD work.
+# Slim display columns per user spec — BD-relevant only.
 DISPLAY_COLS = [
-    CANON["company"], "Cohort", "ASRS Tier", CANON["sector"],
-    "Applicable SBTi Guidance",
-    "MQ Level", "CP Alignment",
-    CANON["near_term_status"], "Target Year (used)", "Year Source", "Years to Target",
-    "Target Scopes Covered",
-    "V2 Reset Likely", "V2 Reset Reasons",
-    "Latest Reported Year", "Required Reduction % (now)", "Actual Reduction % (now)",
-    "Gap to Path (pp)", "Delivery RAG", "Data Source",
-    CANON["net_zero_year"], CANON["long_term_status"], CANON["net_zero_status"],
-    CANON["target_class_long"], CANON["removal_reason"],
-    CANON["date_updated"],
+    CANON["company"],                  # Name
+    "ASRS Tier",                       # Tier (AASB S2)
+    CANON["sector"],                   # Sector
+    CANON["target"],                   # Near Term Target (full target wording)
+    "Target Year (used)",              # Near Term target year
+    CANON["net_zero_year"],            # Net Zero target year
+    "Latest Scope 1 (tCO2e)",          # Emissions 1
+    "Latest Scope 2 (tCO2e)",          # Emissions 2
+    "Latest Scope 3 (tCO2e)",          # Emissions 3
+    "Required Reduction % (now)",      # Committed (required at this point in time)
+    "Actual Reduction % (now)",        # Actual
+    "Gap to Path (pp)",                # Gap to path (numeric)
+    "Delivery RAG",                    # RAG
+    "Data Source",                     # Data source
 ]
 
 

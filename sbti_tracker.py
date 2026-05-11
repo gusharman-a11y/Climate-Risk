@@ -1,4 +1,4 @@
-"""ASX SBTi BD tracker — target screen, delivery, TPI-style indicators.
+"""Corporate Climate Strategy BD Tracker — target screen, delivery, TPI-style indicators.
 
 Run: streamlit run sbti_tracker.py
 """
@@ -94,7 +94,7 @@ def _column_config():
 
 
 st.set_page_config(
-    page_title="ASX SBTi BD tracker",
+    page_title="Corporate Climate Strategy BD Tracker",
     page_icon="🇦🇺",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -114,7 +114,7 @@ st.markdown(
 
 
 # ─── Sidebar: data load ────────────────────────────────────────────────────────
-st.sidebar.title("🇦🇺 ASX SBTi BD tracker")
+st.sidebar.title("🇦🇺 Corporate Climate Strategy BD Tracker")
 st.sidebar.caption("Target adequacy, V2 reset risk, delivery progress")
 
 with st.sidebar.expander("📁 Data sources", expanded=False):
@@ -140,7 +140,7 @@ sbti_df = _load(
 )
 
 if sbti_df.empty:
-    st.title("🇦🇺 ASX SBTi BD tracker")
+    st.title("🇦🇺 Corporate Climate Strategy BD Tracker")
     st.warning(
         f"No SBTi data loaded. Upload the **Companies Taking Action** dataset from "
         f"the sidebar, or commit it to `{DATA_DIR / 'sbti_companies.xlsx'}`."
@@ -331,7 +331,7 @@ screen = attach_tpi(screen)
 
 
 # ─── Title (filters render below) ─────────────────────────────────────────────
-st.title(f"🇦🇺 ASX SBTi BD tracker")
+st.title(f"🇦🇺 Corporate Climate Strategy BD Tracker")
 st.caption(
     "All Australian-listed and large private SBTi companies, plus ASX 200 companies "
     "without SBTi targets. Use the cohort and ASRS Tier filters to slice."
@@ -503,8 +503,8 @@ c4.metric("🎯 High outreach priority", f"{high_priority:,}")
 c5.metric("✅ Aligned 1.5°C", f"{aligned_15:,}")
 
 
-tab_screen, tab_delivery, tab_charts, tab_company, tab_rulebook = st.tabs(
-    ["Cohort", "Delivery", "Sector view", "Company drill-down", "Sector rulebook"]
+tab_screen, tab_company, tab_rulebook = st.tabs(
+    ["Cohort", "Company drill-down", "Sector rulebook"]
 )
 
 
@@ -553,102 +553,6 @@ with tab_screen:
         st.dataframe(bd2_df, use_container_width=True, height=280, hide_index=True,
                      column_config=_column_config())
 
-
-with tab_delivery:
-    st.markdown("### Delivery against committed trajectory")
-    st.caption(
-        "Linear-path comparison from each company's own base year to its target year. "
-        "Required reduction at the latest reporting year is "
-        "(elapsed yrs / horizon yrs) × ambition %. **Gap-to-path (pp)** = actual − required. "
-        "Positive = ahead of path."
-    )
-
-    has_data = filtered["Latest Reported Year"].notna()
-    coverage = int(has_data.sum())
-    total_in_view = len(filtered)
-    g = int((filtered["Delivery RAG"] == "Green").sum())
-    a = int((filtered["Delivery RAG"] == "Amber").sum())
-    r = int((filtered["Delivery RAG"] == "Red").sum())
-    n = int((filtered["Delivery RAG"] == "N/A").sum())
-
-    cov_pct = (coverage / total_in_view * 100) if total_in_view else 0
-    k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric("With reported emissions", f"{coverage:,} / {total_in_view:,}", f"{cov_pct:.0f}% coverage")
-    k2.metric("🟢 On / ahead of path", f"{g:,}")
-    k3.metric("🟡 Behind ≤10pp", f"{a:,}")
-    k4.metric("🔴 Behind >10pp", f"{r:,}")
-    k5.metric("⚪ No data yet", f"{n:,}")
-
-    delivery_cols = [
-        CANON["company"], CANON["sector"], "Applicable SBTi Guidance",
-        "Base Year (used)", "Base S1+S2 (tCO2e)", "Latest Reported Year", "Latest S1+S2 (tCO2e)",
-        "Ambition % (parsed)",
-        "Required Reduction % (now)", "Actual Reduction % (now)",
-        "Gap to Path (pp)", "Delivery RAG", "Data Source",
-    ]
-    delivery_cols = [c for c in delivery_cols if c in filtered.columns]
-    sort_options = ["Gap to Path (pp)", "Years to Target", CANON["company"]]
-    sort_by = st.selectbox("Sort by", sort_options, index=0)
-    ascending = st.checkbox("Ascending (worst gap first)", value=True)
-
-    table = filtered[delivery_cols].copy()
-    if sort_by in table.columns:
-        table = table.sort_values(sort_by, ascending=ascending, na_position="last")
-
-    def _delivery_style(row):
-        c = DELIVERY_COLOUR.get(row.get("Delivery RAG"), "#FFFFFF")
-        return [
-            f"background-color: {c}22; color: {c}; font-weight: 600"
-            if col == "Delivery RAG" else "" for col in row.index
-        ]
-
-    st.dataframe(table.style.apply(_delivery_style, axis=1),
-                 use_container_width=True, height=520, hide_index=True,
-                 column_config=_column_config())
-    st.download_button(
-        "Download delivery table (CSV)",
-        table.to_csv(index=False).encode("utf-8"),
-        file_name="asx_sbti_phase2_delivery.csv",
-        mime="text/csv",
-    )
-
-    st.markdown(
-        "**To populate emissions data:** bulk-upload the CSV template from the "
-        "sidebar, or enter per-company in the **Company drill-down** tab "
-        "(supports PDF upload, URL paste, and auto-search)."
-    )
-
-
-with tab_charts:
-    st.markdown("### V2 reset distribution by SBTi sector guidance")
-    rule_dist = (
-        filtered.groupby(["Applicable SBTi Guidance", "V2 Reset Likely"])
-        .size().reset_index(name="Companies")
-    )
-    if not rule_dist.empty:
-        fig = px.bar(
-            rule_dist, x="Applicable SBTi Guidance", y="Companies", color="V2 Reset Likely",
-            color_discrete_map=V2_COLOUR, barmode="stack",
-        )
-        fig.update_layout(height=480, xaxis_tickangle=-30,
-                          xaxis={"categoryorder": "total descending"})
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown("### Target-year profile")
-    yr_df = filtered[filtered["Target Year (used)"].notna()].copy()
-    if not yr_df.empty:
-        yr_df["Year"] = yr_df["Target Year (used)"].astype(int)
-        year_dist = (
-            yr_df.groupby(["Year", "V2 Reset Likely"]).size().reset_index(name="Companies")
-        )
-        fig2 = px.bar(
-            year_dist, x="Year", y="Companies", color="V2 Reset Likely",
-            color_discrete_map=V2_COLOUR, barmode="stack",
-        )
-        fig2.update_layout(height=380, xaxis_dtick=1)
-        fig2.add_vline(x=2030, line_dash="dash", line_color="#DC2626",
-                       annotation_text="V2 horizon", annotation_position="top")
-        st.plotly_chart(fig2, use_container_width=True)
 
 
 with tab_company:

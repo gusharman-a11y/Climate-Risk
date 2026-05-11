@@ -292,6 +292,9 @@ def assess_delivery(row: pd.Series, cache: dict) -> dict:
 
     return {
         "Latest Reported Year": latest_year if latest_year else pd.NA,
+        "Latest Scope 1 (tCO2e)": (latest.get("s1") if latest else pd.NA) if latest else pd.NA,
+        "Latest Scope 2 (tCO2e)": (latest.get("s2") if latest else pd.NA) if latest else pd.NA,
+        "Latest Scope 3 (tCO2e)": (latest.get("s3") if latest else pd.NA) if latest else pd.NA,
         "Latest S1+S2 (tCO2e)": latest_s12 if latest_s12 is not None else pd.NA,
         "Base Year (used)": base_year if base_year else pd.NA,
         "Base S1+S2 (tCO2e)": base_s12 if base_s12 is not None else pd.NA,
