@@ -51,6 +51,18 @@ def _column_config():
     """Centralised column display rules: friendly names + integer year format."""
     yr = st.column_config.NumberColumn(format="%d")
     return {
+        "Cohort": st.column_config.TextColumn(
+            "Companies",
+            help="Which group the company sits in: ASX listed (SBTi), Australian "
+                 "Corporate / FI (SBTi private), ASX 200 — no SBTi target, or "
+                 "NGER reporters (not in cohort).",
+        ),
+        "Near-term Status": st.column_config.TextColumn(
+            "SBTi Status",
+            help="Status of the SBTi target: Targets set (validated near-term), "
+                 "Committed (intent letter only), Commitment removed, "
+                 "or blank if not in SBTi.",
+        ),
         "MQ Level": st.column_config.TextColumn(
             "Climate maturity",
             help="TPI Management Quality (0–4*). 0 unaware → 4* aligned strategic. "
@@ -463,11 +475,11 @@ with st.container(border=True):
         gcol1, gcol2, gcol3, gcol4 = st.columns(4)
         with gcol1:
             f_cohort = st.multiselect(
-                "Cohort (detailed)",
+                "Companies (detailed)",
                 cohort_options,
                 default=[],
                 key="ftr_cohort",
-                help="Detailed source cohort — usually the SBTi Yes/No filter is enough.",
+                help="Source group — usually the SBTi Yes/No filter is enough.",
             )
             f_sector = st.multiselect("Sector", sectors, key="ftr_sector")
             f_priority = st.radio(
@@ -513,7 +525,7 @@ if f_sbti:
     active_filters.append(f"SBTi: {', '.join(f_sbti)}")
 if f_cohort:
     filtered = filtered[filtered["Cohort"].isin(f_cohort)]
-    active_filters.append(f"Cohort: {len(f_cohort)} selected")
+    active_filters.append(f"Companies: {len(f_cohort)} selected")
 if f_tier:
     filtered = filtered[filtered.get("ASRS Tier", pd.Series([""] * len(filtered))).isin(f_tier)]
     active_filters.append(f"ASRS Tier: {', '.join(f_tier)}")

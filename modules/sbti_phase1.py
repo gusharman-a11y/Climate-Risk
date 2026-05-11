@@ -349,9 +349,6 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
     # Attach ASX listing data (authoritative — overrides ISIN/proxy logic)
     from modules.asx_listings import attach_asx_listing
     out = attach_asx_listing(out)
-    # Promote any row found in the ASX listings to Tier 1 (verified, not proxy)
-    asx_match = out.get("ASX Listed", pd.Series([""] * len(out))) == "Yes"
-    out.loc[asx_match & out["ASRS Tier"].str.contains("proxy", na=False), "ASRS Tier"] = "Tier 1"
     return out
 
 
@@ -421,7 +418,9 @@ def build_screen(df: pd.DataFrame, cohort: str = "ASX listed (SBTi)") -> pd.Data
 # Slim display columns per user spec — BD-relevant only.
 DISPLAY_COLS = [
     CANON["company"],                  # Name
-    "ASX Code",                        # ASX ticker (blank if not listed)
+    "ASX Code",                        # ASX ticker
+    "Cohort",                          # Companies group (relabelled to "Companies" in column_config)
+    CANON["near_term_status"],         # SBTi Status (Targets set / Committed / Commitment removed)
     "ASRS Tier",                       # Tier (AASB S2)
     CANON["sector"],                   # Sector
     CANON["target"],                   # Near Term Target (full target wording)

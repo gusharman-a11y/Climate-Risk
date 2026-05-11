@@ -171,14 +171,17 @@ def _meets(row: pd.Series, t: AsrsThresholds) -> bool:
 
 def asrs_tier(row: pd.Series) -> str:
     """Return AASB S2 / ASRS reporting tier: 'Tier 1', 'Tier 2', 'Tier 3',
-    or 'Unclassified'. Source: AASB S2 Climate-related Disclosures."""
+    or 'Unclassified'. Source: AASB S2 Climate-related Disclosures.
+    Where verified revenue/assets/employees data is unavailable, tier is
+    inferred from market cap tier (ASX 200 cohort), ASX listing status, or
+    NGER reporting threshold. Returned label is plain 'Tier N' regardless
+    of whether verified or proxy."""
     if _meets(row, GROUP_1):
         return "Tier 1"
     if _meets(row, GROUP_2):
         return "Tier 2"
     if any(row.get(c, 0) for c in ("Revenue (AUD)", "Assets (AUD)", "Employees")):
         return "Tier 3"
-    # ASX 200 cohort proxy via Market Cap Tier
     mc = str(row.get("Market Cap Tier", "")).strip().lower()
     if mc == "mega":
         return "Tier 1"
@@ -186,18 +189,14 @@ def asrs_tier(row: pd.Series) -> str:
         return "Tier 1"
     if mc == "mid":
         return "Tier 2"
-    # Fallback proxy from SBTi 'Organization Type'. SBTi uses 'Corporate', 'SME',
-    # 'Financial Institution'. ASX-listed Corporates and FIs are usually Tier 1
-    # by revenue; we mark them 'Tier 1 (proxy)' since we can't verify thresholds
-    # without revenue/assets/employees data.
     org = str(row.get(CANON["org_type"], "")).lower()
     if "sme" in org:
         return "Tier 3"
     if "corporate" in org or "company" in org or "financial" in org:
         isin = str(row.get(CANON["isin"], "")).strip().upper()
         if isin.startswith("AU"):
-            return "Tier 1 (proxy)"
-        return "Tier 2 (proxy)"
+            return "Tier 1"
+        return "Tier 2"
     return "Unclassified"
 
 

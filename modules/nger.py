@@ -429,6 +429,6 @@ def build_nger_only_cohort(existing_cohort_names: list[str]) -> pd.DataFrame:
 
     # Compute ASRS Tier — NGER threshold (>50 ktCO2e Scope 1+2 OR >200 TJ) implies
     # the entity is large enough to be Tier 1 by emissions.
-    out["ASRS Tier"] = "Tier 1 (NGER proxy)"
+    out["ASRS Tier"] = "Tier 1"
 
     return out
