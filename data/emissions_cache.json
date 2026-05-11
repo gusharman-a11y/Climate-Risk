@@ -301,5 +301,69 @@
         "source_url": "https://ditchcarbon.com/organizations/mahindra-automotive-australia-pty"
       }
     ]
+  },
+  "NBN Co Limited": {
+    "company": "NBN Co Limited",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 5000.0,
+        "s2": 269000.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.nbnco.com.au/content/dam/nbn/documents/about-nbn/reports/sustainability-reports/2024-nbn-sustainability-data-book.pdf.coredownload.inline.pdf"
+      }
+    ],
+    "base_year": 2021,
+    "base_s12": 329000.0
+  },
+  "Special Broadcasting Service": {
+    "company": "Special Broadcasting Service",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 46.0,
+        "s2": 3788.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.sbs.com.au/aboutus/2025/04/14/sbs-becomes-first-australian-broadcaster-to-have-near-and-long-term-carbon-reduction-targets-validated-by-the-sbti/"
+      }
+    ],
+    "base_year": 2022,
+    "base_s12": 3834.0
+  },
+  "SunRice (RiceGrowers Limited)": {
+    "company": "SunRice (RiceGrowers Limited)",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 11300.0,
+        "s2": 71100.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://ditchcarbon.com/organizations/sunrice"
+      }
+    ],
+    "base_year": 2023,
+    "base_s12": 79400.0
+  },
+  "Yarra Valley Water": {
+    "company": "Yarra Valley Water",
+    "isin": "",
+    "history": [
+      {
+        "year": 2024,
+        "s1": 3371.0,
+        "s2": 7176.0,
+        "s3": null,
+        "source": "researched",
+        "source_url": "https://www.yvw.com.au/about-us/our-strategy/sustainability/our-journey-net-zero"
+      }
+    ],
+    "base_year": 2012,
+    "base_s12": 32004.0
   }
 }
