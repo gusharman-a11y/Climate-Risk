@@ -256,7 +256,8 @@ def _to_int(v) -> int | None:
 
 
 def best_target_year(row: pd.Series) -> tuple[int | None, str]:
-    """Return (year, source). Falls back near-term -> long-term -> net-zero."""
+    """Return (year, source). Falls back near-term → long-term → net-zero →
+    parsed-from-target-text."""
     nt = _to_int(row.get(CANON["target_year"]))
     if nt is not None:
         return nt, "near-term"
@@ -266,6 +267,12 @@ def best_target_year(row: pd.Series) -> tuple[int | None, str]:
     nz = _to_int(row.get(CANON["net_zero_year"]))
     if nz is not None:
         return nz, "net-zero"
+    # Final fallback: pull "by 20XX" or "by 20YY" from the target wording.
+    text = str(row.get(CANON["target"]) or "")
+    if text:
+        m = re.search(r"by\s+((?:19|20)\d{2})", text, re.I)
+        if m:
+            return int(m.group(1)), "parsed from text"
     return None, ""
 
 
