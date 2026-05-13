@@ -21,6 +21,9 @@ Sources:
 
 import copy
 import json
+import re
+from collections import Counter
+from datetime import date
 from pathlib import Path
 
 ACCU_DATA_FILE = Path("accu_methods_data.json")
@@ -345,3 +348,218 @@ def status_counts(data: dict) -> dict:
         if s in counts:
             counts[s] += 1
     return counts
+
+
+# ── Audit ─────────────────────────────────────────────────────────────────────
+NUMBER_WORDS = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12,
+}
+
+
+def _to_int(token: str) -> int | None:
+    token = token.lower().strip()
+    if token.isdigit():
+        return int(token)
+    return NUMBER_WORDS.get(token)
+
+
+def _category_active_counts(data: dict) -> dict[str, int]:
+    counts: dict[str, int] = {c: 0 for c in CATEGORIES}
+    for row in data.get("methods", []):
+        if row.get("status") == "active" and row.get("category") in counts:
+            counts[row["category"]] += 1
+    return counts
+
+
+def audit_data(data: dict, today: date | None = None) -> list[dict]:
+    """Run internal-consistency checks on the ACCU dashboard data.
+
+    Returns a list of findings: {severity, code, message}. Severity is
+    "error", "warning" or "info". Empty list means everything checks out.
+    """
+    today = today or date.today()
+    findings: list[dict] = []
+    rows = data.get("methods", []) or []
+    counts = status_counts(data)
+    insights_text = " ".join(data.get("key_insights", []))
+
+    # 1. Required fields populated
+    for i, row in enumerate(rows, 1):
+        for col in COLUMNS:
+            if not str(row.get(col, "")).strip():
+                findings.append({
+                    "severity": "error",
+                    "code": "missing_field",
+                    "message": (
+                        f"Row {i} ({row.get('methodology', '?')}): "
+                        f"missing '{COLUMN_LABELS.get(col, col)}'."
+                    ),
+                })
+
+    # 2. Category / status enums
+    for i, row in enumerate(rows, 1):
+        if row.get("category") and row["category"] not in CATEGORIES:
+            findings.append({
+                "severity": "error",
+                "code": "bad_category",
+                "message": (
+                    f"Row {i} ({row.get('methodology', '?')}): "
+                    f"unknown category '{row['category']}'."
+                ),
+            })
+        if row.get("status") and row["status"] not in STATUSES:
+            findings.append({
+                "severity": "error",
+                "code": "bad_status",
+                "message": (
+                    f"Row {i} ({row.get('methodology', '?')}): "
+                    f"unknown status '{row['status']}'."
+                ),
+            })
+
+    # 3. Status ↔ status_timing coherence
+    timing_keywords = {
+        "active": ("active",),
+        "next_to_close": ("sunset", "closing", "expir", "close"),
+        "under_development": ("development", "draft", "consultation"),
+    }
+    for i, row in enumerate(rows, 1):
+        s = row.get("status")
+        timing = str(row.get("status_timing", "")).lower()
+        kws = timing_keywords.get(s, ())
+        if s and timing and kws and not any(k in timing for k in kws):
+            findings.append({
+                "severity": "warning",
+                "code": "status_timing_mismatch",
+                "message": (
+                    f"Row {i} ({row.get('methodology', '?')}): status is "
+                    f"'{STATUS_LABELS.get(s, s)}' but timing reads "
+                    f"'{row.get('status_timing')}'."
+                ),
+            })
+
+    # 4. Duplicate methodology names
+    name_counts = Counter(
+        (row.get("methodology") or "").strip().lower() for row in rows
+    )
+    for name, n in name_counts.items():
+        if name and n > 1:
+            findings.append({
+                "severity": "warning",
+                "code": "duplicate_methodology",
+                "message": f"Methodology appears {n} times: '{name}'.",
+            })
+
+    # 5. Empty categories
+    grouped = methods_by_category(data)
+    for cat, group_rows in grouped.items():
+        if not group_rows:
+            findings.append({
+                "severity": "info",
+                "code": "empty_category",
+                "message": f"Category '{cat}' has no methods listed.",
+            })
+
+    # 6. Insights numeric claims vs table
+    review_match = re.search(
+        r"([A-Za-z]+|\d+)\s+methods?\s+(?:are\s+)?currently\s+under\s+review",
+        insights_text, re.IGNORECASE,
+    )
+    if review_match:
+        claimed = _to_int(review_match.group(1))
+        actual = counts["under_development"]
+        if claimed is not None and claimed != actual:
+            findings.append({
+                "severity": "error",
+                "code": "insight_under_dev_mismatch",
+                "message": (
+                    f"Insights text says '{review_match.group(1)} methods "
+                    f"currently under review' but the table has {actual} "
+                    f"Under Development rows."
+                ),
+            })
+
+    closed_match = re.search(
+        r"([A-Za-z]+|\d+)\s+methods?\s+have\s+closed",
+        insights_text, re.IGNORECASE,
+    )
+    if closed_match:
+        claimed = _to_int(closed_match.group(1))
+        actual = counts["next_to_close"]
+        if claimed is not None and claimed != actual:
+            findings.append({
+                "severity": "warning",
+                "code": "insight_closed_mismatch",
+                "message": (
+                    f"Insights text says '{closed_match.group(1)} methods "
+                    f"have closed' but the table has {actual} Next to Close "
+                    f"rows. (The table may not include already-expired "
+                    f"methods — verify against the DCCEEW sunsetting list.)"
+                ),
+            })
+
+    pathways_match = re.search(
+        r"energy efficiency[^.]*?from\s+([A-Za-z]+|\d+)\s+to\s+([A-Za-z]+|\d+)",
+        insights_text, re.IGNORECASE,
+    )
+    if pathways_match:
+        to_claim = _to_int(pathways_match.group(2))
+        actual_ee_active = _category_active_counts(data)["Energy Efficiency"]
+        if to_claim is not None and to_claim != actual_ee_active:
+            findings.append({
+                "severity": "warning",
+                "code": "insight_ee_pathways_mismatch",
+                "message": (
+                    f"Insights text says Energy Efficiency pathways reduced "
+                    f"to {pathways_match.group(2)}, but the table shows "
+                    f"{actual_ee_active} Active Energy Efficiency method(s)."
+                ),
+            })
+
+    # 7. Future-dated references in updates / status_timing
+    months = (
+        r"(?:January|February|March|April|May|June|July|August|"
+        r"September|October|November|December)"
+    )
+    date_re = re.compile(rf"(\d{{1,2}})\s+({months})\s+(\d{{4}})", re.IGNORECASE)
+    month_idx = {
+        m: i + 1 for i, m in enumerate([
+            "january", "february", "march", "april", "may", "june",
+            "july", "august", "september", "october", "november", "december",
+        ])
+    }
+    for i, row in enumerate(rows, 1):
+        for field in ("updates", "status_timing"):
+            text = str(row.get(field, ""))
+            for d, m, y in date_re.findall(text):
+                try:
+                    found = date(int(y), month_idx[m.lower()], int(d))
+                except ValueError:
+                    continue
+                if found > today:
+                    findings.append({
+                        "severity": "info",
+                        "code": "future_date",
+                        "message": (
+                            f"Row {i} ({row.get('methodology', '?')}): "
+                            f"'{field}' references future date "
+                            f"{found.isoformat()}."
+                        ),
+                    })
+
+    return findings
+
+
+def methods_to_csv(data: dict) -> str:
+    """Render the methods table as CSV (UTF-8, RFC 4180 quoting)."""
+    import csv
+    import io
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
+    writer.writerow([COLUMN_LABELS[c] for c in COLUMNS])
+    for row in data.get("methods", []) or []:
+        writer.writerow([row.get(c, "") for c in COLUMNS])
+    return buf.getvalue()

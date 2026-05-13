@@ -665,6 +665,45 @@ def page_accu_methods() -> None:
     kpi[2].metric("Next to Close", counts["next_to_close"])
     kpi[3].metric("Under Development", counts["under_development"])
 
+    # ── Audit panel ─────────────────────────────────────────────────────────
+    findings = accu_methods.audit_data(data)
+    severity_order = {"error": 0, "warning": 1, "info": 2}
+    findings.sort(key=lambda f: severity_order.get(f["severity"], 99))
+    errors = sum(1 for f in findings if f["severity"] == "error")
+    warnings = sum(1 for f in findings if f["severity"] == "warning")
+    infos = sum(1 for f in findings if f["severity"] == "info")
+    if findings:
+        audit_label = (
+            f"🔍 Data audit — {errors} error(s), {warnings} warning(s), "
+            f"{infos} info"
+        )
+    else:
+        audit_label = "🔍 Data audit — no issues found"
+    with st.expander(audit_label, expanded=bool(errors or warnings)):
+        st.caption(
+            "Internal consistency checks against the methods table and the "
+            "narrative insights. Not a substitute for source verification "
+            "against DCCEEW publications."
+        )
+        if not findings:
+            st.success("All internal checks pass.")
+        else:
+            badge = {
+                "error": ("🔴", "#FEE2E2", "#991B1B"),
+                "warning": ("🟠", "#FEF3C7", "#92400E"),
+                "info": ("🔵", "#DBEAFE", "#1E40AF"),
+            }
+            for f in findings:
+                icon, bg, fg = badge[f["severity"]]
+                st.markdown(
+                    f'<div style="background:{bg};color:{fg};padding:8px 12px;'
+                    f'border-radius:6px;margin-bottom:6px;font-size:0.88rem;">'
+                    f'{icon} <strong>{f["severity"].upper()}</strong> '
+                    f'<code style="background:transparent;color:{fg};">'
+                    f'{f["code"]}</code> — {f["message"]}</div>',
+                    unsafe_allow_html=True,
+                )
+
     st.markdown("---")
 
     # ── Editable methods table (data_editor) ────────────────────────────────
@@ -729,7 +768,7 @@ def page_accu_methods() -> None:
     st.markdown("---")
 
     # ── Action buttons ──────────────────────────────────────────────────────
-    btns = st.columns(3)
+    btns = st.columns(4)
     with btns[0]:
         if st.button("💾 Save", use_container_width=True, type="primary"):
             accu_methods.save_data(data)
@@ -742,6 +781,14 @@ def page_accu_methods() -> None:
         if st.button("📤 Build slide", use_container_width=True):
             st.session_state.accu_pptx_bytes = build_pptx(data)
             st.success("Slide built – download below.")
+    with btns[3]:
+        st.download_button(
+            label="⬇️  Methods CSV",
+            data=accu_methods.methods_to_csv(data),
+            file_name="accu_methods.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
 
     if st.session_state.get("accu_pptx_bytes"):
         st.download_button(
