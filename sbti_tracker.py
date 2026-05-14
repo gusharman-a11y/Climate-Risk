@@ -818,6 +818,69 @@ with tab_company:
         else:
             st.caption("No reported emissions on file. Add via the form below or via CSV upload in the sidebar.")
 
+        # ── Safeguard Mechanism ──
+        st.markdown("---")
+        st.markdown("### Safeguard Mechanism")
+        from modules.safeguard import aggregate as _sfg_agg, is_available as _sfg_avail
+        if not _sfg_avail():
+            st.caption(
+                "Safeguard data not loaded. Copy `baselines-and-emissions.csv` from the "
+                "CER Safeguard register into `data/safeguard_baselines.csv` to enable this section."
+            )
+        else:
+            sfg = _sfg_agg(company)
+            if sfg is None:
+                st.info(
+                    f"**{company}** is not covered under the Safeguard Mechanism — "
+                    "either below the 100 kt CO₂e threshold or no matching facilities found."
+                )
+            else:
+                fac_count = sfg["facility_count"]
+                sfg_c1, sfg_c2, sfg_c3, sfg_c4 = st.columns(4)
+                sfg_c1.metric(
+                    f"Facilit{'y' if fac_count == 1 else 'ies'}",
+                    fac_count,
+                )
+
+                def _kt(v):
+                    if v is None or (isinstance(v, float) and pd.isna(v)):
+                        return "—"
+                    v = float(v)
+                    if abs(v) >= 1_000_000:
+                        return f"{v/1_000_000:.2f} Mt"
+                    if abs(v) >= 1_000:
+                        return f"{v/1_000:.1f} kt"
+                    return f"{v:.0f} t"
+
+                sfg_c2.metric("Covered emissions", _kt(sfg["covered_tco2e"]))
+                sfg_c3.metric("Baseline", _kt(sfg["baseline_tco2e"]))
+                net = sfg["net_position_tco2e"]
+                sfg_c4.metric(
+                    "Net position",
+                    _kt(net),
+                    delta="Below baseline" if net >= 0 else "Above baseline (shortfall)",
+                    delta_color="normal" if net >= 0 else "inverse",
+                )
+
+                accu = sfg["accus_surrendered_tco2e"]
+                smc = sfg["smcs_surrendered_tco2e"]
+                total_sur = sfg["total_surrendered_tco2e"]
+                if total_sur and total_sur > 0:
+                    st.caption(
+                        f"Surrendered: {_kt(accu)} ACCUs + {_kt(smc)} SMCs = **{_kt(total_sur)}** total"
+                    )
+
+                facs = sfg["facilities"]
+                if not facs.empty:
+                    disp_cols = [c for c in ["facility_name", "state", "baseline",
+                                              "covered_emissions", "total_surrendered", "net_position"]
+                                 if c in facs.columns]
+                    facs_disp = facs[disp_cols].copy()
+                    facs_disp.columns = [c.replace("_", " ").title() for c in disp_cols]
+                    st.dataframe(facs_disp, use_container_width=True, hide_index=True)
+
+                st.caption("Source: CER Safeguard Mechanism register. Net position: positive = below baseline (compliant).")
+
         # ── Stored URL one-click fetch (if available) ──
         stored_url_rec = lookup_stored_url(company, isin_key, stored_urls)
         if stored_url_rec and stored_url_rec.get("url"):

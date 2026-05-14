@@ -356,6 +356,23 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
     # Attach ASX listing data (authoritative — overrides ISIN/proxy logic)
     from modules.asx_listings import attach_asx_listing
     out = attach_asx_listing(out)
+    # Populate Safeguard Mechanism columns if data is available
+    from modules.safeguard import is_available as _sfg_avail, aggregate as _sfg_agg
+    if _sfg_avail():
+        def _sfg_row(company_name: str) -> pd.Series:
+            stats = _sfg_agg(str(company_name))
+            if stats is None:
+                return pd.Series({"Safeguard": "No", "Safeguard Covered (tCO2e)": None})
+            return pd.Series({
+                "Safeguard": "Yes",
+                "Safeguard Covered (tCO2e)": stats["covered_tco2e"],
+            })
+        sfg_cols = out[CANON["company"]].apply(_sfg_row)
+        out["Safeguard"] = sfg_cols["Safeguard"]
+        out["Safeguard Covered (tCO2e)"] = sfg_cols["Safeguard Covered (tCO2e)"]
+    else:
+        out["Safeguard"] = ""
+        out["Safeguard Covered (tCO2e)"] = None
     return out
 
 
@@ -433,9 +450,12 @@ DISPLAY_COLS = [
     CANON["target"],                   # Near Term Target (full target wording)
     "Target Year (used)",              # Near Term target year
     CANON["net_zero_year"],            # Net Zero target year
-    "Latest Scope 1 (tCO2e)",          # Emissions 1
-    "Latest Scope 2 (tCO2e)",          # Emissions 2
-    "Latest Scope 3 (tCO2e)",          # Emissions 3
+    "NGER Scope 1 (tCO2e)",           # Regulator-verified Scope 1
+    "Latest Scope 1 (tCO2e)",          # Reported Scope 1
+    "Latest Scope 2 (tCO2e)",          # Reported Scope 2
+    "Latest Scope 3 (tCO2e)",          # Reported Scope 3
+    "Safeguard",                       # In Safeguard Mechanism? (populated by build_all)
+    "Safeguard Covered (tCO2e)",       # Total covered emissions under Safeguard
     "Required Reduction % (now)",      # Committed
     "Actual Reduction % (now)",        # Actual
     "Gap to Path (pp)",                # Gap to path (numeric)

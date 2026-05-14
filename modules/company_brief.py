@@ -2,7 +2,7 @@
 
 Generates a single, copy-paste-ready BD briefing for any company in the
 cohort using only data already in the repo (SBTi, NGER, research overlay,
-emissions cache, delivery math, TPI). No API calls, no cost.
+emissions cache, delivery math, TPI, Safeguard). No API calls, no cost.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import pandas as pd
 
 from modules.sbti import CANON
+from modules.safeguard import aggregate as safeguard_aggregate, is_available as safeguard_available
 
 
 def _fmt_int(v) -> str:
@@ -41,6 +42,87 @@ def _fmt_str(v) -> str:
 
 def _section(title: str, body: str) -> str:
     return f"### {title}\n\n{body}\n"
+
+
+def _fmt_kt(tco2e) -> str:
+    """Format tCO2e value as kt (thousands) with 1 decimal."""
+    try:
+        if tco2e is None or (isinstance(tco2e, float) and pd.isna(tco2e)):
+            return "—"
+        v = float(tco2e)
+        if abs(v) >= 1_000_000:
+            return f"{v/1_000_000:.2f} Mt"
+        if abs(v) >= 1_000:
+            return f"{v/1_000:.1f} kt"
+        return f"{v:.0f} t"
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _build_safeguard_section(company_name: str) -> str:
+    """Build the Safeguard Mechanism markdown section for a company."""
+    if not safeguard_available():
+        return (
+            "_Safeguard data not loaded. Copy `baselines-and-emissions.csv` from the "
+            "CER Safeguard register into `data/safeguard_baselines.csv` to enable this section._"
+        )
+
+    stats = safeguard_aggregate(company_name)
+    if stats is None:
+        return (
+            f"**Not covered under the Safeguard Mechanism** — either below the 100 kt CO₂e "
+            f"threshold or no facilities found matching '{company_name}'."
+        )
+
+    facs = stats["facilities"]
+
+    # Facility table
+    table_rows = ["| Facility | State | Baseline | Covered | Surrendered | Net position |",
+                  "|----------|-------|----------|---------|-------------|-------------|"]
+    for _, row in facs.iterrows():
+        net = row.get("net_position")
+        net_str = _fmt_kt(net)
+        if net is not None:
+            net_str = ("✅ " if net >= 0 else "⚠️ ") + net_str
+        table_rows.append(
+            f"| {row.get('facility_name', '—')} "
+            f"| {row.get('state', '—')} "
+            f"| {_fmt_kt(row.get('baseline'))} "
+            f"| {_fmt_kt(row.get('covered_emissions'))} "
+            f"| {_fmt_kt(row.get('total_surrendered'))} "
+            f"| {net_str} |"
+        )
+
+    table = "\n".join(table_rows)
+
+    # GHG breakdown (aggregate)
+    ghg_lines = []
+    for gas, col in [("CO₂", "ghg_co2"), ("CH₄", "ghg_ch4"), ("N₂O", "ghg_n2o"), ("Other", "ghg_other")]:
+        total = facs[col].fillna(0).sum() if col in facs.columns else 0
+        if total > 0:
+            ghg_lines.append(f"  - {gas}: {_fmt_kt(total)}")
+    ghg_block = "\n".join(ghg_lines) if ghg_lines else "  _Not available_"
+
+    # ACCUs vs SMCs split
+    accus = stats["accus_surrendered_tco2e"]
+    smcs = stats["smcs_surrendered_tco2e"]
+
+    body = (
+        f"✅ **Covered under the Safeguard Mechanism** "
+        f"({stats['facility_count']} facilit{'y' if stats['facility_count'] == 1 else 'ies'})\n\n"
+        f"{table}\n\n"
+        f"**Aggregated across all facilities:**\n"
+        f"- **Baseline:** {_fmt_kt(stats['baseline_tco2e'])}\n"
+        f"- **Covered emissions:** {_fmt_kt(stats['covered_tco2e'])}\n"
+        f"- **ACCUs surrendered:** {_fmt_kt(accus)}\n"
+        f"- **SMCs surrendered:** {_fmt_kt(smcs)}\n"
+        f"- **Total surrendered:** {_fmt_kt(stats['total_surrendered_tco2e'])}\n"
+        f"- **Net position:** {_fmt_kt(stats['net_position_tco2e'])} — {stats['net_position_label']}\n\n"
+        f"**GHG composition (covered emissions):**\n{ghg_block}\n\n"
+        f"_Source: CER Safeguard Mechanism register. "
+        f"Net position: positive = below baseline (surplus), negative = above baseline (shortfall)._"
+    )
+    return body
 
 
 def build_brief(rec: pd.Series, emissions_cache: dict | None = None) -> str:
@@ -194,6 +276,8 @@ def build_brief(rec: pd.Series, emissions_cache: dict | None = None) -> str:
                     + "\n".join(rows)
                 )
 
+    safeguard_block = _build_safeguard_section(company)
+
     parts = [
         header,
         sub,
@@ -202,6 +286,7 @@ def build_brief(rec: pd.Series, emissions_cache: dict | None = None) -> str:
         _section("Target", target_block),
         _section("Delivery vs committed trajectory", delivery_block),
         _section("Latest emissions", emissions_block),
+        _section("Safeguard Mechanism", safeguard_block),
         _section("TPI-style indicators", tpi_block),
         _section("Research & BD signals", research_block),
     ]
