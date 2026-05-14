@@ -53,6 +53,8 @@ from modules.asrs import (
     bd_priority_label,
 )
 from modules.company_brief import build_brief
+from modules.voluntary import voluntary_retirements, is_available as voluntary_available
+from modules.safeguard import aggregate as safeguard_aggregate, is_available as safeguard_available
 
 
 def _column_config():
@@ -467,7 +469,7 @@ st.caption(
 )
 
 tab_screen, tab_company, tab_insights, tab_asrs, tab_brief, tab_rulebook = st.tabs(
-    ["📊 Cohort", "🔍 Company drill-down", "💡 BD Insights", "🗓️ ASRS Screen", "📋 Company Brief", "📚 Sector rulebook"]
+    ["📋 Company Screen", "🔍 Company drill-down", "💡 BD Insights", "🗓️ ASRS & Emissions", "📋 Company Brief", "📚 Sector rulebook"]
 )
 
 # ─── Filter / KPI / cohort content lives inside the Cohort tab ────────────────
@@ -1075,78 +1077,125 @@ with tab_insights:
 
 
 with tab_asrs:
-    st.markdown("### 🗓️ ASRS Mandatory Disclosure Screen")
+    st.markdown("### 🗓️ ASRS & Emissions — Company Screen")
     st.caption(
-        "Maps every cohort company to its ASRS reporting group under the "
-        "**Corporations Amendment (Sustainability Reporting) Act 2024**. "
-        "Companies without a validated SBTi target face mandatory climate disclosure "
-        "without a credible strategy — Pollination's core advisory wedge."
+        "Every cohort company mapped to its ASRS reporting group, SBTi/target status, "
+        "Safeguard Mechanism coverage, and voluntary ACCU retirements. "
+        "Use this as your primary BD prospect list."
     )
 
-    # ── Enrich with ASRS columns ──────────────────────────────────────────────
-    asrs_df = add_asrs_columns(screen)
+    # ── Known FY year-end exceptions (ASX code → month-day string) ────────────
+    _DEC_YE = {"RIO", "STO", "WDS", "WPL", "NHC", "WHC", "NUF", "KAR", "BPT"}
+    _SEP_YE = {"ANZ", "NAB", "WBC", "BOQ", "BEN"}
+    _MAR_YE = {"MQG"}
+
+    def _fy_end(asx_code: str) -> str:
+        c = str(asx_code).strip().upper()
+        if c in _DEC_YE:
+            return "31 Dec"
+        if c in _SEP_YE:
+            return "30 Sep"
+        if c in _MAR_YE:
+            return "31 Mar"
+        return "30 Jun"
+
+    def _first_asrs_report(asrs_group: str, fy_end: str) -> str:
+        """First mandatory ASRS report period (financial year + approx due date)."""
+        if asrs_group == "Group 1":
+            if fy_end == "31 Dec":
+                return "FY2025 (due ~Apr 2026)"
+            if fy_end == "30 Sep":
+                return "FY2025/26 (due ~Jan 2026)"
+            if fy_end == "31 Mar":
+                return "FY2025/26 (due ~Jul 2026)"
+            return "FY2025/26 (due ~Oct 2026)"
+        if asrs_group == "Group 2":
+            if fy_end == "31 Dec":
+                return "FY2026 (due ~Apr 2027)"
+            return "FY2026/27 (due ~Oct 2027)"
+        if asrs_group == "Group 3":
+            if fy_end == "31 Dec":
+                return "FY2027 (due ~Apr 2028)"
+            return "FY2027/28 (due ~Oct 2028)"
+        return "—"
+
+    # ── Build enriched table (cached on company list hash) ────────────────────
+    @st.cache_data(show_spinner="Building emissions & Safeguard view…", ttl=600)
+    def _build_asrs_table(company_names: tuple, _screen_hash: int) -> pd.DataFrame:
+        from modules.voluntary import voluntary_retirements as _vol
+        from modules.safeguard import aggregate as _sfg
+
+        rows = []
+        for name in company_names:
+            sfg = _sfg(name)
+            vol = _vol(name)
+            rows.append({
+                "company": name,
+                "sfg_surrendered": sfg["total_surrendered_tco2e"] if sfg else None,
+                "vol_retirements": vol,
+            })
+        return pd.DataFrame(rows).set_index("company")
+
+    _company_tuple = tuple(screen[CANON["company"]].dropna().astype(str).tolist())
+    _screen_hash = hash(_company_tuple)
+    enrich = _build_asrs_table(_company_tuple, _screen_hash)
+
+    # ── Enrich screen with ASRS + CER columns ────────────────────────────────
+    asrs_df = add_asrs_columns(screen).copy()
+    asrs_df["FY Year End"] = asrs_df["ASX Code"].apply(
+        lambda c: _fy_end(str(c)) if pd.notna(c) else "30 Jun"
+    )
+    asrs_df["First ASRS Report"] = asrs_df.apply(
+        lambda r: _first_asrs_report(
+            str(r.get("ASRS Group", "")),
+            str(r.get("FY Year End", "30 Jun")),
+        ),
+        axis=1,
+    )
+    asrs_df["Safeguard Surrendered (tCO2e)"] = asrs_df[CANON["company"]].map(
+        lambda n: enrich.loc[n, "sfg_surrendered"] if n in enrich.index else None
+    )
+    asrs_df["Voluntary Retirements (ACCUs)"] = asrs_df[CANON["company"]].map(
+        lambda n: enrich.loc[n, "vol_retirements"] if n in enrich.index else None
+    )
 
     target_col = next(
         (c for c in ("Target Classification", "Target Classification (BD)") if c in asrs_df.columns),
         None,
     )
 
-    # ── KPI row by group ──────────────────────────────────────────────────────
+    # ── KPI row ───────────────────────────────────────────────────────────────
     g1_all = asrs_df[asrs_df["ASRS Group"] == "Group 1"]
     g2_all = asrs_df[asrs_df["ASRS Group"] == "Group 2"]
-    g3_all = asrs_df[asrs_df["ASRS Group"] == "Group 3"]
 
-    def _no_validated_target(sub: pd.DataFrame) -> int:
+    def _no_validated(sub):
         if target_col is None:
             return len(sub)
-        return int(
-            (~sub[target_col].astype(str).str.lower().str.contains(
-                "targets set|validated", na=False
-            )).sum()
-        )
+        return int((~sub[target_col].astype(str).str.lower().str.contains(
+            "targets set|validated", na=False)).sum())
 
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric(
-        "Group 1 companies",
-        len(g1_all),
-        help="Mandatory from periods beginning 1 Jan 2025 (FY2025/26 for June year-ends).",
-    )
-    k2.metric(
-        "Group 1 — BD prospects",
-        _no_validated_target(g1_all),
-        help="Group 1 companies without a validated SBTi target.",
-        delta="reporting NOW",
-        delta_color="inverse",
-    )
-    k3.metric(
-        "Group 2 companies",
-        len(g2_all),
-        help="Mandatory from periods beginning 1 Jul 2026 (FY2026/27 for June year-ends).",
-    )
-    k4.metric(
-        "Group 2 — BD prospects",
-        _no_validated_target(g2_all),
-        help="Group 2 companies without a validated SBTi target.",
-        delta="report FY2026/27",
-        delta_color="off",
-    )
-
-    st.markdown("---")
-
-    # ── Group urgency banners ─────────────────────────────────────────────────
-    for group_label, note in GROUP_URGENCY_NOTE.items():
-        st.markdown(note)
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("Group 1 companies", len(g1_all),
+              help="Mandatory from 1 Jan 2025 (FY2025/26 for June year-ends).")
+    k2.metric("Group 1 BD prospects", _no_validated(g1_all),
+              delta="reporting NOW", delta_color="inverse",
+              help="Group 1 without a validated SBTi target.")
+    k3.metric("Group 2 companies", len(g2_all),
+              help="Mandatory from 1 Jul 2026.")
+    k4.metric("Group 2 BD prospects", _no_validated(g2_all),
+              delta="report FY2026/27", delta_color="off")
+    sfg_count = int(asrs_df["Safeguard"].eq("Yes").sum()) if "Safeguard" in asrs_df.columns else 0
+    k5.metric("Safeguard-covered", sfg_count,
+              help="Companies with at least one Safeguard-covered facility.")
 
     st.markdown("---")
 
     # ── Filters ───────────────────────────────────────────────────────────────
-    fc1, fc2, fc3 = st.columns(3)
+    fc1, fc2, fc3, fc4 = st.columns(4)
     with fc1:
         f_asrs_group = st.multiselect(
-            "ASRS Group",
-            ["Group 1", "Group 2", "Group 3", "Unclassified"],
-            default=["Group 1", "Group 2"],
-            key="asrs_screen_group",
+            "ASRS Group", ["Group 1", "Group 2", "Group 3", "Unclassified"],
+            default=["Group 1", "Group 2"], key="asrs_screen_group",
         )
     with fc2:
         sector_opts = sorted(asrs_df[CANON["sector"]].dropna().unique())
@@ -1154,8 +1203,10 @@ with tab_asrs:
     with fc3:
         tc_opts = sorted(asrs_df[target_col].dropna().unique()) if target_col else []
         f_target = st.multiselect("Target classification", tc_opts, key="asrs_screen_target")
+    with fc4:
+        f_sfg_only = st.checkbox("Safeguard-covered only", key="asrs_sfg_only")
+        f_vol_only = st.checkbox("Has voluntary retirements", key="asrs_vol_only")
 
-    # ── Apply filters ─────────────────────────────────────────────────────────
     view = asrs_df.copy()
     if f_asrs_group:
         view = view[view["ASRS Group"].isin(f_asrs_group)]
@@ -1163,17 +1214,18 @@ with tab_asrs:
         view = view[view[CANON["sector"]].isin(f_sector)]
     if f_target and target_col:
         view = view[view[target_col].isin(f_target)]
-
-    # Sort by BD Priority Score descending
+    if f_sfg_only and "Safeguard" in view.columns:
+        view = view[view["Safeguard"] == "Yes"]
+    if f_vol_only:
+        view = view[view["Voluntary Retirements (ACCUs)"].notna() &
+                    (view["Voluntary Retirements (ACCUs)"] > 0)]
     if "BD Priority Score" in view.columns:
         view = view.sort_values("BD Priority Score", ascending=False)
 
-    # ── Summary bar chart: companies by group + target status ─────────────────
+    # ── Summary chart ─────────────────────────────────────────────────────────
     if not view.empty and target_col:
         grp_summary = (
-            view.groupby(["ASRS Group", target_col])
-            .size()
-            .reset_index(name="count")
+            view.groupby(["ASRS Group", target_col]).size().reset_index(name="count")
         )
         _tc_order = ["No public target", "Aspirational", "Net-zero only",
                      "Quantitative non-validated", "SBTi committed", "Targets set"]
@@ -1183,50 +1235,66 @@ with tab_asrs:
             sub = grp_summary[grp_summary[target_col] == tc]
             fig.add_trace(go.Bar(x=sub["ASRS Group"], y=sub["count"], name=tc))
         fig.update_layout(
-            barmode="stack",
-            height=280,
+            barmode="stack", height=260,
             margin=dict(l=10, r=10, t=30, b=10),
-            plot_bgcolor="white",
-            paper_bgcolor="white",
+            plot_bgcolor="white", paper_bgcolor="white",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             font=dict(family="Inter, Helvetica, sans-serif", size=11),
             title="Companies by ASRS Group and target status",
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    # ── Table ─────────────────────────────────────────────────────────────────
-    display_cols = [
-        "Company Name", "ASX Code", CANON["sector"], "Cohort",
-        "ASRS Group", "First Mandatory Report",
+    # ── Main table ────────────────────────────────────────────────────────────
+    display_cols = [c for c in [
+        CANON["company"],
+        "ASX Code",
+        CANON["sector"],
+        "ASRS Group",
+        CANON["near_term_status"],
         target_col or "Target Classification",
-        "BD Priority", "BD Priority Score",
-    ]
-    display_cols = [c for c in display_cols if c and c in view.columns]
+        "FY Year End",
+        "First ASRS Report",
+        "Safeguard",
+        "Safeguard Covered (tCO2e)",
+        "Safeguard Surrendered (tCO2e)",
+        "Voluntary Retirements (ACCUs)",
+        "BD Priority Score",
+    ] if c and c in view.columns]
 
     st.markdown(f"**{len(view)} companies** match current filters")
     st.dataframe(
         view[display_cols].reset_index(drop=True),
         use_container_width=True,
         hide_index=True,
-        height=480,
+        height=520,
         column_config={
-            "BD Priority Score": st.column_config.ProgressColumn(
-                "BD Priority Score",
-                min_value=0,
-                max_value=15,
-                format="%d",
+            CANON["near_term_status"]: st.column_config.TextColumn("SBTi Status"),
+            "Safeguard Covered (tCO2e)": st.column_config.NumberColumn(
+                "Safeguard Covered (tCO2e)", format="%,.0f",
+                help="Total covered emissions across all Safeguard facilities.",
             ),
-            "First Mandatory Report": st.column_config.TextColumn(
-                "First Mandatory Report",
-                help="First ASRS report period (assumes June 30 FY). Dec year-end companies report one period earlier.",
+            "Safeguard Surrendered (tCO2e)": st.column_config.NumberColumn(
+                "Safeguard Surrendered (tCO2e)", format="%,.0f",
+                help="ACCUs + SMCs surrendered under the Safeguard Mechanism.",
+            ),
+            "Voluntary Retirements (ACCUs)": st.column_config.NumberColumn(
+                "Voluntary Retirements (ACCUs)", format="%,.0f",
+                help="Total ACCUs voluntarily retired in the ANREU register.",
+            ),
+            "BD Priority Score": st.column_config.ProgressColumn(
+                "BD Priority", min_value=0, max_value=15, format="%d",
+            ),
+            "First ASRS Report": st.column_config.TextColumn(
+                "First ASRS Report",
+                help="First mandatory ASRS report period. FY end assumed 30 Jun unless known otherwise.",
             ),
         },
     )
 
     st.download_button(
-        "⬇ Download ASRS BD screen (CSV)",
+        "⬇ Download ASRS & Emissions screen (CSV)",
         view[display_cols].to_csv(index=False).encode("utf-8"),
-        file_name="asrs_bd_screen.csv",
+        file_name="asrs_emissions_screen.csv",
         mime="text/csv",
     )
 
