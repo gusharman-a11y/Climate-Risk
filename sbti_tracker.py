@@ -468,8 +468,8 @@ st.caption(
     "without SBTi targets. Pick a tab to explore."
 )
 
-tab_screen, tab_company, tab_insights, tab_asrs, tab_brief, tab_rulebook = st.tabs(
-    ["📋 Company Screen", "🔍 Company drill-down", "💡 BD Insights", "🗓️ ASRS & Emissions", "📋 Company Brief", "📚 Sector rulebook"]
+tab_company, tab_asrs, tab_safeguard, tab_insights, tab_brief, tab_rulebook = st.tabs(
+    ["🔍 Company drill-down", "🏢 AUS Company Profile", "🏭 Safeguard Register", "💡 BD Insights", "📋 Company Brief", "📚 Sector rulebook"]
 )
 
 # ─── Filter / KPI / cohort content lives inside the Cohort tab ────────────────
@@ -479,88 +479,77 @@ sbti_options = ["Yes", "No"]
 asrs_tiers_present = [t for t in ["Tier 1", "Tier 1 (proxy)", "Tier 2", "Tier 2 (proxy)", "Tier 3", "Unclassified"]
                       if t in screen.get("ASRS Tier", pd.Series(dtype=str)).unique()]
 
-with tab_screen, st.container(border=True):
+with st.sidebar.expander("🔍 Filters", expanded=False):
     st.caption("**Filters** — change any to narrow the view; defaults show all companies.")
-    fcol1, fcol2, fcol3, fcol4 = st.columns([2, 2, 2, 1])
-    with fcol1:
-        f_sbti = st.multiselect(
-            "SBTi target",
-            sbti_options,
-            default=[],
-            key="ftr_sbti",
-            help=(
-                "Yes = company has an SBTi entry (validated, committed, or removed).\n"
-                "No = no SBTi entry — covers ASX 200 without SBTi targets and "
-                "the NGER-reporter universe."
-            ),
-        )
-    with fcol2:
-        f_tier = st.multiselect(
-            "AASB S2 / ASRS reporting tier",
-            asrs_tiers_present,
-            default=[],
-            key="ftr_tier",
-            help=(
-                "Per AASB S2 Climate-related Disclosures (the Australian ISSB-aligned standard).\n\n"
-                "**Tier 1**: meets ≥2 of A$500M revenue / A$1B assets / 500 employees.\n"
-                "**Tier 2**: meets ≥2 of A$200M / A$500M / 250.\n"
-                "**Tier 3**: meets ≥2 of A$50M / A$25M / 100.\n\n"
-                "**(proxy)** = revenue/assets/employees not on file; tier inferred."
-            ),
-        )
-    with fcol3:
-        search = st.text_input("🔍 Search by company name", key="ftr_search")
-    with fcol4:
-        if st.button("↻ Clear filters", use_container_width=True):
-            for k in ("ftr_search", "ftr_sector", "ftr_priority", "ftr_yrs",
-                      "ftr_mq", "ftr_cp", "ftr_delivery", "ftr_cohort", "ftr_tier",
-                      "ftr_sbti"):
-                if k in st.session_state:
-                    del st.session_state[k]
-            st.rerun()
-
+    f_sbti = st.multiselect(
+        "SBTi target",
+        sbti_options,
+        default=[],
+        key="ftr_sbti",
+        help=(
+            "Yes = company has an SBTi entry (validated, committed, or removed).\n"
+            "No = no SBTi entry — covers ASX 200 without SBTi targets and "
+            "the NGER-reporter universe."
+        ),
+    )
+    f_tier = st.multiselect(
+        "AASB S2 / ASRS reporting tier",
+        asrs_tiers_present,
+        default=[],
+        key="ftr_tier",
+        help=(
+            "Per AASB S2 Climate-related Disclosures (the Australian ISSB-aligned standard).\n\n"
+            "**Tier 1**: meets ≥2 of A$500M revenue / A$1B assets / 500 employees.\n"
+            "**Tier 2**: meets ≥2 of A$200M / A$500M / 250.\n"
+            "**Tier 3**: meets ≥2 of A$50M / A$25M / 100.\n\n"
+            "**(proxy)** = revenue/assets/employees not on file; tier inferred."
+        ),
+    )
+    search = st.text_input("🔍 Search by company name", key="ftr_search")
+    if st.button("↻ Clear filters", use_container_width=True):
+        for k in ("ftr_search", "ftr_sector", "ftr_priority", "ftr_yrs",
+                  "ftr_mq", "ftr_cp", "ftr_delivery", "ftr_cohort", "ftr_tier",
+                  "ftr_sbti"):
+            if k in st.session_state:
+                del st.session_state[k]
+        st.rerun()
     with st.expander("More filters", expanded=False):
-        gcol1, gcol2, gcol3, gcol4 = st.columns(4)
-        with gcol1:
-            f_cohort = st.multiselect(
-                "Companies (detailed)",
-                cohort_options,
-                default=[],
-                key="ftr_cohort",
-                help="Source group — usually the SBTi Yes/No filter is enough.",
-            )
-            f_sector = st.multiselect("Sector", sectors, key="ftr_sector")
-            f_priority = st.radio(
-                "Outreach priority",
-                ["All", "High (target ≤2030 or scope gap)", "Low (target >2030 and on track)"],
-                index=0, key="ftr_priority",
-                help="High = target year ≤2030, target year passed, or required scopes missing.",
-            )
-        with gcol2:
-            f_yrs = st.slider(
-                "Years to target",
-                min_value=-10, max_value=30, value=(-10, 30), step=1,
-                key="ftr_yrs",
-                help="Negative = target year already passed.",
-            )
-            f_mq = st.multiselect(
-                "Climate maturity (TPI MQ)",
-                ["0", "1", "2", "3", "4", "4*"],
-                key="ftr_mq",
-            )
-        with gcol3:
-            f_cp = st.multiselect(
-                "CP Alignment",
-                ["Aligned 1.5°C", "Aligned Below 2°C", "Aligned 2°C / NDC",
-                 "Not aligned", "Insufficient disclosure"],
-                key="ftr_cp",
-            )
-        with gcol4:
-            f_delivery = st.multiselect(
-                "Delivery RAG",
-                ["Green", "Amber", "Red", "N/A"],
-                key="ftr_delivery",
-            )
+        f_cohort = st.multiselect(
+            "Companies (detailed)",
+            cohort_options,
+            default=[],
+            key="ftr_cohort",
+            help="Source group — usually the SBTi Yes/No filter is enough.",
+        )
+        f_sector = st.multiselect("Sector", sectors, key="ftr_sector")
+        f_priority = st.radio(
+            "Outreach priority",
+            ["All", "High (target ≤2030 or scope gap)", "Low (target >2030 and on track)"],
+            index=0, key="ftr_priority",
+            help="High = target year ≤2030, target year passed, or required scopes missing.",
+        )
+        f_yrs = st.slider(
+            "Years to target",
+            min_value=-10, max_value=30, value=(-10, 30), step=1,
+            key="ftr_yrs",
+            help="Negative = target year already passed.",
+        )
+        f_mq = st.multiselect(
+            "Climate maturity (TPI MQ)",
+            ["0", "1", "2", "3", "4", "4*"],
+            key="ftr_mq",
+        )
+        f_cp = st.multiselect(
+            "CP Alignment",
+            ["Aligned 1.5°C", "Aligned Below 2°C", "Aligned 2°C / NDC",
+             "Not aligned", "Insufficient disclosure"],
+            key="ftr_cp",
+        )
+        f_delivery = st.multiselect(
+            "Delivery RAG",
+            ["Green", "Amber", "Red", "N/A"],
+            key="ftr_delivery",
+        )
 
 # Track active filters for chip display
 active_filters: list[str] = []
@@ -604,87 +593,6 @@ if f_cp:
 if f_delivery:
     filtered = filtered[filtered["Delivery RAG"].isin(f_delivery)]
     active_filters.append(f"Delivery RAG: {', '.join(f_delivery)}")
-
-# ── Chips + KPIs render inside the Cohort tab ─────────────────────────────────
-with tab_screen:
-    if active_filters:
-        chip_html = " ".join(
-            f"<span style='display:inline-block; background:#1E40AF22; color:#1E40AF; "
-            f"padding:2px 10px; border-radius:12px; font-size:0.82rem; "
-            f"font-weight:500; margin-right:6px;'>{f}</span>"
-            for f in active_filters
-        )
-        st.markdown(
-            f"**Showing {len(filtered)} of {total_in_cohort} companies**  &nbsp; {chip_html}",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            f"**Showing all {total_in_cohort} companies in cohort** — no filters active."
-        )
-
-    total = len(filtered)
-    due_2030 = int((filtered["Target Year (used)"] <= 2030).fillna(False).sum())
-    expired = int((filtered["Years to Target"] < 0).fillna(False).sum())
-    high_priority = int((filtered["V2 Reset Likely"] == "Yes").sum())
-    aligned_15 = int((filtered["CP Alignment"] == "Aligned 1.5°C").sum())
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Companies in view", f"{total:,}")
-    c2.metric("⏰ Target ≤2030", f"{due_2030:,}")
-    c3.metric("⏳ Target year passed", f"{expired:,}")
-    c4.metric("🎯 High outreach priority", f"{high_priority:,}")
-    c5.metric("✅ Aligned 1.5°C", f"{aligned_15:,}")
-
-
-with tab_screen:
-    st.markdown("### Cohort — ranked by target proximity")
-    st.caption("Sorted by **Years to Target** ascending — most imminent first.")
-
-    cols_present = [c for c in DISPLAY_COLS if c in filtered.columns]
-    table = filtered[cols_present].copy()
-
-    # Tint the Delivery RAG cell so the cohort table reads at a glance.
-    def _row_style(row):
-        rag = row.get("Delivery RAG", "")
-        colour = DELIVERY_COLOUR.get(rag, "#FFFFFF")
-        return [
-            f"background-color: {colour}22; color: {colour}; font-weight: 600"
-            if c == "Delivery RAG" else "" for c in row.index
-        ]
-
-    styler = table.style.apply(_row_style, axis=1)
-    st.dataframe(styler, use_container_width=True, height=620, hide_index=True,
-                 column_config=_column_config())
-
-    st.download_button(
-        "Download Phase 1 screen (CSV)",
-        table.to_csv(index=False).encode("utf-8"),
-        file_name="asx_sbti_phase1_screen.csv",
-        mime="text/csv",
-    )
-
-    bd1, bd2 = st.columns(2)
-    with bd1:
-        st.markdown("**Outreach list — looming targets (≤2030)**")
-        bd1_df = (
-            filtered[filtered["Target Year (used)"] <= 2030]
-            [[CANON["company"], CANON["sector"], "Target Year (used)", "Years to Target",
-              "Applicable SBTi Guidance"]]
-            .sort_values("Years to Target")
-        )
-        st.dataframe(bd1_df, use_container_width=True, height=280, hide_index=True,
-                     column_config=_column_config())
-    with bd2:
-        st.markdown("**Outreach list — V2 will force a target reset**")
-        bd2_df = (
-            filtered[filtered["V2 Reset Likely"] == "Yes"]
-            [[CANON["company"], CANON["sector"], "V2 Reset Reasons"]]
-        )
-        st.dataframe(bd2_df, use_container_width=True, height=280, hide_index=True,
-                     column_config=_column_config())
-
-
 
 with tab_company:
     st.markdown("### Company drill-down")
@@ -1077,11 +985,11 @@ with tab_insights:
 
 
 with tab_asrs:
-    st.markdown("### 🗓️ ASRS & Emissions — Company Screen")
+    st.markdown("### 🏢 AUS Company Profile")
     st.caption(
         "Every cohort company mapped to its ASRS reporting group, SBTi/target status, "
-        "Safeguard Mechanism coverage, and voluntary ACCU retirements. "
-        "Use this as your primary BD prospect list."
+        "near-term target wording, net-zero commitment, Safeguard Mechanism coverage, "
+        "and voluntary ACCU retirements. Use this as your primary BD prospect list."
     )
 
     # ── Known FY year-end exceptions (ASX code → month-day string) ────────────
@@ -1245,6 +1153,14 @@ with tab_asrs:
         st.plotly_chart(fig, use_container_width=True)
 
     # ── Main table ────────────────────────────────────────────────────────────
+    # Truncate near-term target text for display
+    if CANON["target"] in view.columns:
+        view = view.copy()
+        view["Near-term Target (short)"] = (
+            view[CANON["target"]].astype(str).str[:120]
+            .where(view[CANON["target"]].notna(), "—")
+        )
+
     display_cols = [c for c in [
         CANON["company"],
         "ASX Code",
@@ -1252,12 +1168,17 @@ with tab_asrs:
         "ASRS Group",
         CANON["near_term_status"],
         target_col or "Target Classification",
+        "Near-term Target (short)",
+        CANON["net_zero_year"],
+        "Target Year (used)",
         "FY Year End",
         "First ASRS Report",
         "Safeguard",
         "Safeguard Covered (tCO2e)",
         "Safeguard Surrendered (tCO2e)",
         "Voluntary Retirements (ACCUs)",
+        "Research Source URL",
+        "Data Source",
         "BD Priority Score",
     ] if c and c in view.columns]
 
@@ -1268,35 +1189,354 @@ with tab_asrs:
         hide_index=True,
         height=520,
         column_config={
-            CANON["near_term_status"]: st.column_config.TextColumn("SBTi Status"),
-            "Safeguard Covered (tCO2e)": st.column_config.NumberColumn(
-                "Safeguard Covered (tCO2e)", format="%,.0f",
-                help="Total covered emissions across all Safeguard facilities.",
+            CANON["company"]: st.column_config.TextColumn(
+                "Company",
+                help="Company name as listed in the SBTi register or ASX 200 cohort.",
             ),
-            "Safeguard Surrendered (tCO2e)": st.column_config.NumberColumn(
-                "Safeguard Surrendered (tCO2e)", format="%,.0f",
-                help="ACCUs + SMCs surrendered under the Safeguard Mechanism.",
+            "ASX Code": st.column_config.TextColumn(
+                "ASX Code",
+                help="ASX ticker code. Blank for private companies not listed on the ASX.",
             ),
-            "Voluntary Retirements (ACCUs)": st.column_config.NumberColumn(
-                "Voluntary Retirements (ACCUs)", format="%,.0f",
-                help="Total ACCUs voluntarily retired in the ANREU register.",
+            CANON["sector"]: st.column_config.TextColumn(
+                "Sector",
+                help="GICS or SBTi sector classification used to determine applicable guidance.",
             ),
-            "BD Priority Score": st.column_config.ProgressColumn(
-                "BD Priority", min_value=0, max_value=15, format="%d",
+            "ASRS Group": st.column_config.TextColumn(
+                "ASRS Group",
+                help=(
+                    "Mandatory ASRS reporting group under AASB S2 Climate-related Disclosures.\n\n"
+                    "Group 1: mandatory from FY2025/26 (large entities).\n"
+                    "Group 2: mandatory from FY2026/27.\n"
+                    "Group 3: mandatory from FY2027/28."
+                ),
+            ),
+            CANON["near_term_status"]: st.column_config.TextColumn(
+                "SBTi Status",
+                help=(
+                    "Status in the SBTi register: 'Targets set' = validated near-term target, "
+                    "'Committed' = intent letter submitted but not yet validated, "
+                    "'Commitment removed' = lapsed commitment."
+                ),
+            ),
+            target_col or "Target Classification": st.column_config.TextColumn(
+                "Target Classification",
+                help=(
+                    "BD-assigned target classification: No public target, Aspirational, "
+                    "Net-zero only, Quantitative non-validated, SBTi committed, or Targets set."
+                ),
+            ),
+            "Near-term Target (short)": st.column_config.TextColumn(
+                "Near-term Target",
+                help="Full near-term SBTi target wording as submitted. Truncated to 120 chars.",
+            ),
+            CANON["net_zero_year"]: st.column_config.NumberColumn(
+                "Net-Zero Year",
+                format="%d",
+                help="Year the company has committed to reach net-zero emissions.",
+            ),
+            "Target Year (used)": st.column_config.NumberColumn(
+                "Target Year",
+                format="%d",
+                help="Near-term target year (from SBTi or research overlay).",
+            ),
+            "FY Year End": st.column_config.TextColumn(
+                "FY Year End",
+                help=(
+                    "Financial year-end date for this entity. "
+                    "Most ASX companies use 30 Jun; banks use 30 Sep; mining majors vary."
+                ),
             ),
             "First ASRS Report": st.column_config.TextColumn(
                 "First ASRS Report",
                 help="First mandatory ASRS report period. FY end assumed 30 Jun unless known otherwise.",
             ),
+            "Safeguard": st.column_config.TextColumn(
+                "Safeguard",
+                help="Yes if the company has at least one facility covered under the Safeguard Mechanism (100 kt CO₂e threshold).",
+            ),
+            "Safeguard Covered (tCO2e)": st.column_config.NumberColumn(
+                "Safeguard Covered (tCO2e)",
+                format="%,.0f",
+                help="Total covered emissions (tCO₂e) across all Safeguard-covered facilities for this company.",
+            ),
+            "Safeguard Surrendered (tCO2e)": st.column_config.NumberColumn(
+                "Safeguard Surrendered (tCO2e)",
+                format="%,.0f",
+                help="ACCUs + SMCs surrendered under the Safeguard Mechanism to meet baseline obligations.",
+            ),
+            "Voluntary Retirements (ACCUs)": st.column_config.NumberColumn(
+                "Voluntary Retirements (ACCUs)",
+                format="%,.0f",
+                help="Total ACCUs voluntarily retired in the ANREU register (excludes Safeguard surrenders).",
+            ),
+            "Research Source URL": st.column_config.LinkColumn(
+                "Source",
+                help="Link to the sustainability report or SBTi disclosure used as the primary data source.",
+            ),
+            "Data Source": st.column_config.TextColumn(
+                "Data source",
+                help="Primary data source: SBTi register or research overlay (manual/PDF/URL ingest).",
+            ),
+            "BD Priority Score": st.column_config.ProgressColumn(
+                "BD Priority",
+                min_value=0,
+                max_value=15,
+                format="%d",
+                help=(
+                    "Composite BD priority score (0–15). Higher = stronger outreach case. "
+                    "Factors: ASRS group urgency, missing validated target, Safeguard coverage, "
+                    "target proximity, and voluntary retirement activity."
+                ),
+            ),
         },
     )
 
     st.download_button(
-        "⬇ Download ASRS & Emissions screen (CSV)",
+        "⬇ Download AUS Company Profile (CSV)",
         view[display_cols].to_csv(index=False).encode("utf-8"),
-        file_name="asrs_emissions_screen.csv",
+        file_name="aus_company_profile.csv",
         mime="text/csv",
     )
+    st.caption(
+        "⚠️ ASRS Group and FY Year End are indicative — derived from market cap tier proxy "
+        "where financial data is unavailable. Verify against ASIC filings. "
+        "Voluntary retirements include all ANREU cancellations matched by entity name "
+        "(may include trading intermediaries)."
+    )
+
+
+with tab_safeguard:
+    from modules.safeguard import load_safeguard
+
+    st.markdown("### 🏭 Safeguard Mechanism — Register Overview")
+    st.caption(
+        "All facilities covered under the Safeguard Mechanism (CER register, FY2024-25). "
+        "100 kt CO₂e threshold."
+    )
+
+    @st.cache_data(show_spinner="Loading Safeguard register…", ttl=600)
+    def _load_safeguard_full():
+        return load_safeguard()
+
+    if not safeguard_available():
+        st.warning(
+            "Safeguard register not loaded. Copy `baselines-and-emissions.csv` from the "
+            "CER Safeguard register into `data/safeguard_baselines.csv` to enable this tab."
+        )
+    else:
+        sfg_full = _load_safeguard_full()
+
+        if sfg_full is None or sfg_full.empty:
+            st.info("Safeguard register loaded but contains no rows.")
+        else:
+            # ── KPI row ──────────────────────────────────────────────────────
+            total_fac = len(sfg_full)
+            total_cov_mt = sfg_full["covered_emissions"].sum() / 1_000_000 if "covered_emissions" in sfg_full.columns else 0
+            total_base_mt = sfg_full["baseline"].sum() / 1_000_000 if "baseline" in sfg_full.columns else 0
+            total_accus_kt = sfg_full["accus_surrendered"].sum() / 1_000 if "accus_surrendered" in sfg_full.columns else 0
+            above_base = int((sfg_full["net_position"] < 0).sum()) if "net_position" in sfg_full.columns else 0
+            pct_above = above_base / total_fac * 100 if total_fac > 0 else 0
+
+            sk1, sk2, sk3, sk4, sk5 = st.columns(5)
+            sk1.metric("Total facilities", f"{total_fac:,}")
+            sk2.metric("Total covered emissions", f"{total_cov_mt:.1f} Mt",
+                       help="Sum of covered emissions across all facilities (Mt CO₂e).")
+            sk3.metric("Total baseline", f"{total_base_mt:.1f} Mt",
+                       help="Sum of assigned baselines across all facilities (Mt CO₂e).")
+            sk4.metric("Total ACCUs surrendered", f"{total_accus_kt:.0f} kt",
+                       help="Total ACCUs surrendered to meet Safeguard obligations.")
+            sk5.metric("Facilities above baseline", f"{above_base:,} ({pct_above:.0f}%)",
+                       help="Facilities where covered emissions exceed the assigned baseline (net_position < 0).")
+
+            st.markdown("---")
+
+            # ── Chart 1: Top 20 by covered emissions ─────────────────────────
+            if "covered_emissions" in sfg_full.columns and "facility_name" in sfg_full.columns:
+                st.markdown("**Top 20 facilities by covered emissions**")
+                top20 = (
+                    sfg_full.nlargest(20, "covered_emissions")
+                    .sort_values("covered_emissions", ascending=True)
+                )
+                fig_top20 = px.bar(
+                    top20,
+                    y="facility_name",
+                    x="covered_emissions",
+                    orientation="h",
+                    labels={"covered_emissions": "Covered emissions (tCO₂e)", "facility_name": "Facility"},
+                    height=500,
+                )
+                fig_top20.update_layout(
+                    margin=dict(l=10, r=10, t=30, b=10),
+                    plot_bgcolor="white", paper_bgcolor="white",
+                    font=dict(family="Inter, Helvetica, sans-serif", size=11),
+                )
+                st.plotly_chart(fig_top20, use_container_width=True)
+
+            # ── Chart 2: State breakdowns ─────────────────────────────────────
+            if "state" in sfg_full.columns and "covered_emissions" in sfg_full.columns:
+                ch2_left, ch2_right = st.columns(2)
+                state_cov = (
+                    sfg_full.groupby("state")["covered_emissions"].sum()
+                    .reset_index()
+                    .sort_values("covered_emissions", ascending=False)
+                )
+                with ch2_left:
+                    st.markdown("**Covered emissions by state**")
+                    fig_state_cov = px.bar(
+                        state_cov,
+                        x="state",
+                        y="covered_emissions",
+                        labels={"covered_emissions": "Covered emissions (tCO₂e)", "state": "State"},
+                    )
+                    fig_state_cov.update_layout(
+                        margin=dict(l=10, r=10, t=30, b=10),
+                        plot_bgcolor="white", paper_bgcolor="white",
+                        font=dict(family="Inter, Helvetica, sans-serif", size=11),
+                    )
+                    st.plotly_chart(fig_state_cov, use_container_width=True)
+
+                if "net_position" in sfg_full.columns:
+                    with ch2_right:
+                        st.markdown("**Net position by state**")
+                        state_net = (
+                            sfg_full.groupby("state")["net_position"].sum()
+                            .reset_index()
+                            .sort_values("net_position", ascending=False)
+                        )
+                        state_net["Status"] = state_net["net_position"].apply(
+                            lambda v: "Compliant (below baseline)" if v >= 0 else "Shortfall (above baseline)"
+                        )
+                        fig_state_net = px.bar(
+                            state_net,
+                            x="state",
+                            y="net_position",
+                            color="Status",
+                            color_discrete_map={
+                                "Compliant (below baseline)": "#16A34A",
+                                "Shortfall (above baseline)": "#DC2626",
+                            },
+                            labels={"net_position": "Net position (tCO₂e)", "state": "State"},
+                        )
+                        fig_state_net.update_layout(
+                            margin=dict(l=10, r=10, t=30, b=10),
+                            plot_bgcolor="white", paper_bgcolor="white",
+                            font=dict(family="Inter, Helvetica, sans-serif", size=11),
+                        )
+                        st.plotly_chart(fig_state_net, use_container_width=True)
+
+            # ── Chart 3: GHG composition by state ────────────────────────────
+            ghg_cols = [c for c in ["ghg_co2", "ghg_ch4", "ghg_n2o", "ghg_other"]
+                        if c in sfg_full.columns and sfg_full[c].sum() > 0]
+            if ghg_cols and "state" in sfg_full.columns:
+                st.markdown("**GHG composition across all facilities**")
+                ghg_state = sfg_full.groupby("state")[ghg_cols].sum().reset_index()
+                ghg_melt = ghg_state.melt(id_vars="state", value_vars=ghg_cols,
+                                           var_name="GHG", value_name="tCO2e")
+                ghg_melt["GHG"] = ghg_melt["GHG"].str.replace("ghg_", "").str.upper()
+                fig_ghg = px.bar(
+                    ghg_melt,
+                    x="state",
+                    y="tCO2e",
+                    color="GHG",
+                    barmode="stack",
+                    labels={"tCO2e": "Emissions (tCO₂e)", "state": "State"},
+                )
+                fig_ghg.update_layout(
+                    margin=dict(l=10, r=10, t=30, b=10),
+                    plot_bgcolor="white", paper_bgcolor="white",
+                    font=dict(family="Inter, Helvetica, sans-serif", size=11),
+                )
+                st.plotly_chart(fig_ghg, use_container_width=True)
+
+            # ── Chart 4: ACCUs vs SMCs + baseline scatter ─────────────────────
+            ch4_left, ch4_right = st.columns(2)
+            surr_cols = [c for c in ["accus_surrendered", "smcs_surrendered"]
+                         if c in sfg_full.columns]
+            if surr_cols and "state" in sfg_full.columns:
+                with ch4_left:
+                    st.markdown("**ACCUs vs SMCs surrendered by state**")
+                    surr_state = sfg_full.groupby("state")[surr_cols].sum().reset_index()
+                    surr_melt = surr_state.melt(id_vars="state", value_vars=surr_cols,
+                                                 var_name="Type", value_name="tCO2e")
+                    surr_melt["Type"] = surr_melt["Type"].str.replace("_surrendered", "").str.upper()
+                    fig_surr = px.bar(
+                        surr_melt,
+                        x="state",
+                        y="tCO2e",
+                        color="Type",
+                        barmode="group",
+                        labels={"tCO2e": "Surrendered (tCO₂e)", "state": "State"},
+                    )
+                    fig_surr.update_layout(
+                        margin=dict(l=10, r=10, t=30, b=10),
+                        plot_bgcolor="white", paper_bgcolor="white",
+                        font=dict(family="Inter, Helvetica, sans-serif", size=11),
+                    )
+                    st.plotly_chart(fig_surr, use_container_width=True)
+
+            if "baseline" in sfg_full.columns and "covered_emissions" in sfg_full.columns:
+                with ch4_right:
+                    st.markdown("**Baseline vs Covered emissions**")
+                    hover_cols = [c for c in ["facility_name", "responsible_emitter", "state"]
+                                  if c in sfg_full.columns]
+                    fig_scatter = px.scatter(
+                        sfg_full,
+                        x="baseline",
+                        y="covered_emissions",
+                        hover_data=hover_cols if hover_cols else None,
+                        labels={
+                            "baseline": "Baseline (tCO₂e)",
+                            "covered_emissions": "Covered emissions (tCO₂e)",
+                        },
+                    )
+                    # Add y = x diagonal reference line
+                    axis_max = max(
+                        sfg_full["baseline"].max(),
+                        sfg_full["covered_emissions"].max(),
+                    )
+                    fig_scatter.add_shape(
+                        type="line",
+                        x0=0, y0=0, x1=axis_max, y1=axis_max,
+                        line=dict(color="#94A3B8", width=1, dash="dash"),
+                    )
+                    fig_scatter.update_layout(
+                        margin=dict(l=10, r=10, t=30, b=10),
+                        plot_bgcolor="white", paper_bgcolor="white",
+                        font=dict(family="Inter, Helvetica, sans-serif", size=11),
+                    )
+                    st.plotly_chart(fig_scatter, use_container_width=True)
+
+            # ── Full facility table ───────────────────────────────────────────
+            st.markdown("---")
+            st.markdown("**Full facility register**")
+            sfg_table_cols = [c for c in [
+                "facility_name", "responsible_emitter", "state",
+                "baseline", "covered_emissions",
+                "accus_surrendered", "smcs_surrendered", "net_position",
+            ] if c in sfg_full.columns]
+            sfg_table = sfg_full[sfg_table_cols].copy()
+            st.dataframe(
+                sfg_table.reset_index(drop=True),
+                use_container_width=True,
+                hide_index=True,
+                height=520,
+                column_config={
+                    "facility_name": st.column_config.TextColumn("Facility"),
+                    "responsible_emitter": st.column_config.TextColumn("Responsible Emitter"),
+                    "state": st.column_config.TextColumn("State"),
+                    "baseline": st.column_config.NumberColumn("Baseline (tCO₂e)", format="%,.0f"),
+                    "covered_emissions": st.column_config.NumberColumn("Covered Emissions (tCO₂e)", format="%,.0f"),
+                    "accus_surrendered": st.column_config.NumberColumn("ACCUs Surrendered", format="%,.0f"),
+                    "smcs_surrendered": st.column_config.NumberColumn("SMCs Surrendered", format="%,.0f"),
+                    "net_position": st.column_config.NumberColumn("Net Position (tCO₂e)", format="%+,.0f"),
+                },
+            )
+            st.download_button(
+                "⬇ Download Safeguard register (CSV)",
+                sfg_table.to_csv(index=False).encode("utf-8"),
+                file_name="safeguard_register.csv",
+                mime="text/csv",
+            )
 
 
 with tab_brief:
