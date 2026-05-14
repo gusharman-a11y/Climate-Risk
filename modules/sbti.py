@@ -143,8 +143,11 @@ def load_sbti(file: Path | io.BytesIO | None = None) -> pd.DataFrame:
 
 
 # ── ASRS tiering ───────────────────────────────────────────────────────────────
-# Group 1: ≥2 of (revenue ≥ A$500M, assets ≥ A$1B, employees ≥ 500)
-# Group 2: ≥2 of (revenue ≥ A$200M, assets ≥ A$500M, employees ≥ 250)
+# Corporations Amendment (Sustainability Reporting) Act 2024.
+# ≥2 of 3 thresholds must be met for each group.
+# Group 1: revenue ≥ $500M | assets ≥ $1B   | employees ≥ 500  (from 1 Jan 2025)
+# Group 2: revenue ≥ $200M | assets ≥ $500M | employees ≥ 500  (from 1 Jul 2026)
+# Group 3: revenue ≥ $50M  | assets ≥ $25M  | employees ≥ 100  (from 1 Jul 2027)
 
 
 @dataclass
@@ -155,7 +158,8 @@ class AsrsThresholds:
 
 
 GROUP_1 = AsrsThresholds(500_000_000, 1_000_000_000, 500)
-GROUP_2 = AsrsThresholds(200_000_000, 500_000_000, 250)
+GROUP_2 = AsrsThresholds(200_000_000, 500_000_000, 500)   # employees corrected: 250 → 500
+GROUP_3 = AsrsThresholds(50_000_000, 25_000_000, 100)     # new — mandatory from 1 Jul 2027
 
 
 def _meets(row: pd.Series, t: AsrsThresholds) -> bool:
@@ -171,24 +175,24 @@ def _meets(row: pd.Series, t: AsrsThresholds) -> bool:
 
 def asrs_tier(row: pd.Series) -> str:
     """Return AASB S2 / ASRS reporting tier: 'Tier 1', 'Tier 2', 'Tier 3',
-    or 'Unclassified'. Source: AASB S2 Climate-related Disclosures.
-    Where verified revenue/assets/employees data is unavailable, tier is
-    inferred from market cap tier (ASX 200 cohort), ASX listing status, or
-    NGER reporting threshold. Returned label is plain 'Tier N' regardless
-    of whether verified or proxy."""
+    or 'Unclassified'. Kept for backward compatibility — new code should use
+    modules.asrs.asrs_group() which returns 'Group N' labels with correct
+    mandatory dates. This function mirrors that logic but returns 'Tier N'."""
     if _meets(row, GROUP_1):
         return "Tier 1"
     if _meets(row, GROUP_2):
         return "Tier 2"
-    if any(row.get(c, 0) for c in ("Revenue (AUD)", "Assets (AUD)", "Employees")):
+    if _meets(row, GROUP_3):
         return "Tier 3"
+    # Proxy from Market Cap Tier (ASX 200 cohort)
     mc = str(row.get("Market Cap Tier", "")).strip().lower()
-    if mc == "mega":
-        return "Tier 1"
-    if mc == "large":
+    if mc in ("mega", "large"):
         return "Tier 1"
     if mc == "mid":
         return "Tier 2"
+    if mc in ("small", "micro"):
+        return "Tier 3"
+    # Proxy from organisation type + ISIN
     org = str(row.get(CANON["org_type"], "")).lower()
     if "sme" in org:
         return "Tier 3"

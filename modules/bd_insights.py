@@ -16,6 +16,7 @@ from __future__ import annotations
 import pandas as pd
 
 from modules.sbti import CANON
+from modules.asrs import add_asrs_columns, bd_priority_label, TARGET_CLASS_URGENCY
 
 
 # ─── Individual insights ─────────────────────────────────────────────────────
@@ -190,9 +191,85 @@ def asx_listed_committed_only(df: pd.DataFrame) -> dict:
     }
 
 
+def asrs_mandatory_window(df: pd.DataFrame) -> dict:
+    """ASRS Group 1 + 2 companies without a credible validated target — the
+    core mandatory-disclosure BD window for Pollination."""
+    enriched = add_asrs_columns(df)
+
+    target_col = next(
+        (c for c in ("Target Classification", "Target Classification (BD)") if c in enriched.columns),
+        None,
+    )
+
+    # Focus on Group 1 and Group 2 — reporting in the next 1-2 years
+    prospects = enriched[enriched["ASRS Group"].isin(["Group 1", "Group 2"])].copy()
+
+    # Exclude already-validated SBTi targets (lower advisory value)
+    if target_col:
+        prospects = prospects[
+            ~prospects[target_col].astype(str).str.lower().str.contains("targets set|validated", na=False)
+        ]
+
+    if prospects.empty:
+        return {
+            "title": "ASRS mandatory BD window — no unmet prospects found",
+            "summary": "All Group 1 / Group 2 companies appear to have validated SBTi targets.",
+            "table": None,
+            "table_caption": "",
+        }
+
+    prospects = prospects.sort_values(
+        ["BD Priority Score", "ASRS Group", CANON["sector"]],
+        ascending=[False, True, True],
+    )
+
+    cols = [
+        "Company Name",
+        "ASX Code",
+        CANON["sector"],
+        "ASRS Group",
+        "First Mandatory Report",
+        target_col or "Target Classification",
+        "BD Priority",
+        "BD Priority Score",
+    ]
+    cols = [c for c in cols if c in prospects.columns]
+
+    g1 = (enriched["ASRS Group"] == "Group 1").sum()
+    g2 = (enriched["ASRS Group"] == "Group 2").sum()
+    unmet_g1 = (
+        prospects["ASRS Group"] == "Group 1"
+    ).sum()
+    unmet_g2 = (
+        prospects["ASRS Group"] == "Group 2"
+    ).sum()
+
+    return {
+        "title": (
+            f"ASRS mandatory disclosure window — "
+            f"{unmet_g1} Group 1 + {unmet_g2} Group 2 BD prospects"
+        ),
+        "summary": (
+            f"Group 1 companies ({g1} total) must file their first ASRS sustainability "
+            f"report for FY2025/26 — they are in that year right now. "
+            f"Group 2 companies ({g2} total) follow in FY2026/27. "
+            f"Shown here: {len(prospects)} without a validated SBTi target — "
+            "these companies face mandatory climate disclosure without a credible strategy. "
+            "Pollination's pitch: a validated target framework before the report lands."
+        ),
+        "table": prospects[cols],
+        "table_caption": (
+            "Sorted by BD Priority Score (highest urgency first). "
+            "Group 1 = reporting NOW (FY2025/26). Group 2 = reporting in FY2026/27. "
+            "🔴 Critical = Group 1 + no public target. Verify before outreach."
+        ),
+    }
+
+
 # ─── Registry ────────────────────────────────────────────────────────────────
 
 INSIGHTS = {
+    "🗓️ ASRS mandatory disclosure window": asrs_mandatory_window,
     "Top 10 BD targets": top_bd_targets,
     "Behind on delivery trajectory": behind_on_delivery,
     "SBTi commitment removed (re-engagement)": sbti_commitment_removed,

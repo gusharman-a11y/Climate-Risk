@@ -46,6 +46,11 @@ from modules.nger import (
 )
 from modules.tpi import MQ_COLOUR, CP_COLOUR, attach_tpi
 from modules.bd_insights import INSIGHTS
+from modules.asrs import (
+    add_asrs_columns,
+    GROUP_URGENCY_NOTE,
+    bd_priority_label,
+)
 from modules.company_brief import build_brief
 
 
@@ -460,8 +465,8 @@ st.caption(
     "without SBTi targets. Pick a tab to explore."
 )
 
-tab_screen, tab_company, tab_insights, tab_brief, tab_rulebook = st.tabs(
-    ["📊 Cohort", "🔍 Company drill-down", "💡 BD Insights", "📋 Company Brief", "📚 Sector rulebook"]
+tab_screen, tab_company, tab_insights, tab_asrs, tab_brief, tab_rulebook = st.tabs(
+    ["📊 Cohort", "🔍 Company drill-down", "💡 BD Insights", "🗓️ ASRS Screen", "📋 Company Brief", "📚 Sector rulebook"]
 )
 
 # ─── Filter / KPI / cohort content lives inside the Cohort tab ────────────────
@@ -1003,6 +1008,163 @@ with tab_insights:
             )
         else:
             st.caption("(No rows matched this insight in the current cohort.)")
+
+
+with tab_asrs:
+    st.markdown("### 🗓️ ASRS Mandatory Disclosure Screen")
+    st.caption(
+        "Maps every cohort company to its ASRS reporting group under the "
+        "**Corporations Amendment (Sustainability Reporting) Act 2024**. "
+        "Companies without a validated SBTi target face mandatory climate disclosure "
+        "without a credible strategy — Pollination's core advisory wedge."
+    )
+
+    # ── Enrich with ASRS columns ──────────────────────────────────────────────
+    asrs_df = add_asrs_columns(screen)
+
+    target_col = next(
+        (c for c in ("Target Classification", "Target Classification (BD)") if c in asrs_df.columns),
+        None,
+    )
+
+    # ── KPI row by group ──────────────────────────────────────────────────────
+    g1_all = asrs_df[asrs_df["ASRS Group"] == "Group 1"]
+    g2_all = asrs_df[asrs_df["ASRS Group"] == "Group 2"]
+    g3_all = asrs_df[asrs_df["ASRS Group"] == "Group 3"]
+
+    def _no_validated_target(sub: pd.DataFrame) -> int:
+        if target_col is None:
+            return len(sub)
+        return int(
+            (~sub[target_col].astype(str).str.lower().str.contains(
+                "targets set|validated", na=False
+            )).sum()
+        )
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric(
+        "Group 1 companies",
+        len(g1_all),
+        help="Mandatory from periods beginning 1 Jan 2025 (FY2025/26 for June year-ends).",
+    )
+    k2.metric(
+        "Group 1 — BD prospects",
+        _no_validated_target(g1_all),
+        help="Group 1 companies without a validated SBTi target.",
+        delta="reporting NOW",
+        delta_color="inverse",
+    )
+    k3.metric(
+        "Group 2 companies",
+        len(g2_all),
+        help="Mandatory from periods beginning 1 Jul 2026 (FY2026/27 for June year-ends).",
+    )
+    k4.metric(
+        "Group 2 — BD prospects",
+        _no_validated_target(g2_all),
+        help="Group 2 companies without a validated SBTi target.",
+        delta="report FY2026/27",
+        delta_color="off",
+    )
+
+    st.markdown("---")
+
+    # ── Group urgency banners ─────────────────────────────────────────────────
+    for group_label, note in GROUP_URGENCY_NOTE.items():
+        st.markdown(note)
+
+    st.markdown("---")
+
+    # ── Filters ───────────────────────────────────────────────────────────────
+    fc1, fc2, fc3 = st.columns(3)
+    with fc1:
+        f_asrs_group = st.multiselect(
+            "ASRS Group",
+            ["Group 1", "Group 2", "Group 3", "Unclassified"],
+            default=["Group 1", "Group 2"],
+            key="asrs_screen_group",
+        )
+    with fc2:
+        sector_opts = sorted(asrs_df[CANON["sector"]].dropna().unique())
+        f_sector = st.multiselect("Sector", sector_opts, key="asrs_screen_sector")
+    with fc3:
+        tc_opts = sorted(asrs_df[target_col].dropna().unique()) if target_col else []
+        f_target = st.multiselect("Target classification", tc_opts, key="asrs_screen_target")
+
+    # ── Apply filters ─────────────────────────────────────────────────────────
+    view = asrs_df.copy()
+    if f_asrs_group:
+        view = view[view["ASRS Group"].isin(f_asrs_group)]
+    if f_sector:
+        view = view[view[CANON["sector"]].isin(f_sector)]
+    if f_target and target_col:
+        view = view[view[target_col].isin(f_target)]
+
+    # Sort by BD Priority Score descending
+    if "BD Priority Score" in view.columns:
+        view = view.sort_values("BD Priority Score", ascending=False)
+
+    # ── Summary bar chart: companies by group + target status ─────────────────
+    if not view.empty and target_col:
+        grp_summary = (
+            view.groupby(["ASRS Group", target_col])
+            .size()
+            .reset_index(name="count")
+        )
+        _tc_order = ["No public target", "Aspirational", "Net-zero only",
+                     "Quantitative non-validated", "SBTi committed", "Targets set"]
+        fig = go.Figure()
+        for tc in sorted(grp_summary[target_col].unique(),
+                         key=lambda x: _tc_order.index(x) if x in _tc_order else 99):
+            sub = grp_summary[grp_summary[target_col] == tc]
+            fig.add_trace(go.Bar(x=sub["ASRS Group"], y=sub["count"], name=tc))
+        fig.update_layout(
+            barmode="stack",
+            height=280,
+            margin=dict(l=10, r=10, t=30, b=10),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            font=dict(family="Inter, Helvetica, sans-serif", size=11),
+            title="Companies by ASRS Group and target status",
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    # ── Table ─────────────────────────────────────────────────────────────────
+    display_cols = [
+        "Company Name", "ASX Code", CANON["sector"], "Cohort",
+        "ASRS Group", "First Mandatory Report",
+        target_col or "Target Classification",
+        "BD Priority", "BD Priority Score",
+    ]
+    display_cols = [c for c in display_cols if c and c in view.columns]
+
+    st.markdown(f"**{len(view)} companies** match current filters")
+    st.dataframe(
+        view[display_cols].reset_index(drop=True),
+        use_container_width=True,
+        hide_index=True,
+        height=480,
+        column_config={
+            "BD Priority Score": st.column_config.ProgressColumn(
+                "BD Priority Score",
+                min_value=0,
+                max_value=15,
+                format="%d",
+            ),
+            "First Mandatory Report": st.column_config.TextColumn(
+                "First Mandatory Report",
+                help="First ASRS report period (assumes June 30 FY). Dec year-end companies report one period earlier.",
+            ),
+        },
+    )
+
+    st.download_button(
+        "⬇ Download ASRS BD screen (CSV)",
+        view[display_cols].to_csv(index=False).encode("utf-8"),
+        file_name="asrs_bd_screen.csv",
+        mime="text/csv",
+    )
 
 
 with tab_brief:
