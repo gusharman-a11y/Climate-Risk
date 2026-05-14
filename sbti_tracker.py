@@ -1335,6 +1335,26 @@ with tab_safeguard:
     def _load_safeguard_full():
         return load_safeguard()
 
+    @st.cache_data(show_spinner="Loading ACCU surrender methods…", ttl=600)
+    def _load_surrender_methods() -> pd.DataFrame:
+        from pathlib import Path
+        p = Path(__file__).resolve().parent / "data" / "cer" / "accu-surrender-methods.csv"
+        if not p.exists():
+            return pd.DataFrame()
+        df = pd.read_csv(p, encoding="utf-8-sig")
+        df.columns = df.columns.str.strip()
+        rename = {
+            "Responsible emitter": "responsible_emitter",
+            "ACCU method type": "accu_method_type",
+            "Quantity surrendered": "qty_surrendered",
+        }
+        df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+        df["qty_surrendered"] = (
+            df["qty_surrendered"].astype(str).str.replace(",", "").str.strip()
+        )
+        df["qty_surrendered"] = pd.to_numeric(df["qty_surrendered"], errors="coerce").fillna(0)
+        return df
+
     if not safeguard_available():
         st.warning(
             "Safeguard register not loaded. Copy `baselines-and-emissions.csv` from the "
@@ -1342,6 +1362,97 @@ with tab_safeguard:
         )
     else:
         sfg_full = _load_safeguard_full()
+        surrender_df = _load_surrender_methods()
+
+        # ── Hero: Compliance Surrenders by Emitter ───────────────────────────
+        if not surrender_df.empty:
+            st.markdown("#### Compliance Surrenders by Emitter")
+            st.caption("ACCUs surrendered under the Safeguard Mechanism, broken down by ACCU method type. Source: CER Safeguard register, FY2024-25.")
+
+            # Pivot: rows = emitter, cols = method type, values = qty surrendered
+            pivot = (
+                surrender_df.groupby(["responsible_emitter", "accu_method_type"])["qty_surrendered"]
+                .sum()
+                .reset_index()
+            )
+            pivot_wide = pivot.pivot_table(
+                index="responsible_emitter",
+                columns="accu_method_type",
+                values="qty_surrendered",
+                aggfunc="sum",
+                fill_value=0,
+            )
+            pivot_wide["Grand total"] = pivot_wide.sum(axis=1)
+            pivot_wide = pivot_wide.sort_values("Grand total", ascending=False).reset_index()
+
+            # Method type order (most common first)
+            method_order = ["Vegetation", "Waste", "Savanna Fire Management",
+                            "Industrial Fugitives", "Facilities", "Energy Efficiency", "Agriculture"]
+            method_cols = [c for c in method_order if c in pivot_wide.columns]
+            other_cols = [c for c in pivot_wide.columns
+                         if c not in method_cols + ["responsible_emitter", "Grand total"]]
+            ordered_cols = ["responsible_emitter"] + method_cols + other_cols + ["Grand total"]
+            pivot_wide = pivot_wide[[c for c in ordered_cols if c in pivot_wide.columns]]
+
+            # Add grand total row
+            total_row = {c: pivot_wide[c].sum() if c != "responsible_emitter" else "Grand total"
+                         for c in pivot_wide.columns}
+            pivot_display = pd.concat(
+                [pivot_wide, pd.DataFrame([total_row])], ignore_index=True
+            )
+
+            # Format numbers as "K" strings for display
+            def _fmt_k(v):
+                try:
+                    f = float(v)
+                    return f"{f/1000:.1f}K" if f >= 1000 else (f"{f:,.0f}" if f > 0 else "—")
+                except (ValueError, TypeError):
+                    return str(v)
+
+            display_pivot = pivot_display.copy()
+            for col in display_pivot.columns:
+                if col != "responsible_emitter":
+                    display_pivot[col] = display_pivot[col].apply(_fmt_k)
+
+            col_cfg = {
+                "responsible_emitter": st.column_config.TextColumn("Responsible Emitter", width="large"),
+                "Grand total": st.column_config.TextColumn("Grand Total", width="small"),
+            }
+            for mc in method_cols + other_cols:
+                col_cfg[mc] = st.column_config.TextColumn(mc, width="small")
+
+            # Filters
+            sf_c1, sf_c2 = st.columns(2)
+            with sf_c1:
+                method_filter = st.multiselect(
+                    "Method type", method_cols + other_cols, key="sfg_method_filter",
+                    help="Filter to specific ACCU method types.",
+                )
+            with sf_c2:
+                top_n = st.slider("Show top N emitters", 5, len(pivot_wide), min(20, len(pivot_wide)),
+                                  key="sfg_top_n")
+
+            # Apply filters
+            show_cols = method_filter if method_filter else (method_cols + other_cols)
+            display_cols_pivot = ["responsible_emitter"] + [c for c in show_cols if c in display_pivot.columns] + ["Grand total"]
+            display_pivot_filtered = display_pivot[display_cols_pivot].iloc[:top_n + 1]  # +1 for grand total row
+
+            st.dataframe(
+                display_pivot_filtered,
+                use_container_width=True,
+                hide_index=True,
+                height=min(600, (top_n + 2) * 35 + 40),
+                column_config=col_cfg,
+            )
+
+            st.download_button(
+                "⬇ Download compliance surrenders (CSV)",
+                pivot_wide.to_csv(index=False).encode("utf-8"),
+                file_name="safeguard_compliance_surrenders.csv",
+                mime="text/csv",
+            )
+
+            st.markdown("---")
 
         if sfg_full is None or sfg_full.empty:
             st.info("Safeguard register loaded but contains no rows.")
