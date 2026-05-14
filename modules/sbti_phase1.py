@@ -324,6 +324,14 @@ COHORTS = {
     "NGER reporters (not in cohort)": None,  # Loaded from NGER xlsx; large-emitter universe
 }
 
+# Display label mapping: internal cohort key → BD-friendly "Listed" column value
+_COHORT_TO_LISTED = {
+    "ASX listed (SBTi)": "ASX Listed",
+    "Australian Corporate / FI (SBTi, private)": "Private & Unlisted",
+    "ASX 200 — no SBTi target": "ASX Listed",
+    "NGER reporters (not in cohort)": "Private & Unlisted",
+}
+
 
 def build_all(df: pd.DataFrame) -> pd.DataFrame:
     """Combined view of all four cohorts in one DataFrame, with a 'Cohort'
@@ -340,8 +348,10 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
     if not parts:
         return pd.DataFrame()
     out = pd.concat(parts, ignore_index=True, sort=False)
+    # Add BD-friendly "Listed" column (ASX Listed / Private & Unlisted)
+    out["Listed"] = out["Cohort"].map(_COHORT_TO_LISTED).fillna("Private & Unlisted")
     out = out.sort_values(
-        ["Cohort", "Years to Target"],
+        ["Listed", "Years to Target"],
         ascending=[True, True],
         na_position="last",
     ).reset_index(drop=True)
@@ -373,6 +383,15 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
     else:
         out["Safeguard"] = ""
         out["Safeguard Covered (tCO2e)"] = None
+    # NGER Reporter flag — "Yes" for companies in the NGER-only cohort or matched
+    # to the NGER dataset; "No" otherwise.
+    out["NGER Reporter"] = out["Cohort"].map(
+        lambda c: "Yes" if c == "NGER reporters (not in cohort)" else "No"
+    )
+    # Also flag SBTi + ASX200 companies that appear in the Safeguard register
+    # as likely NGER reporters (Safeguard threshold 100kt > NGER threshold 25kt)
+    if "Safeguard" in out.columns:
+        out.loc[out["Safeguard"] == "Yes", "NGER Reporter"] = "Yes"
     return out
 
 

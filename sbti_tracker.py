@@ -472,55 +472,59 @@ tab_company, tab_asrs, tab_safeguard, tab_insights, tab_brief, tab_rulebook = st
     ["🔍 Company drill-down", "🏢 AUS Company Profile", "🏭 Safeguard Register", "💡 BD Insights", "📋 Company Brief", "📚 Sector rulebook"]
 )
 
-# ─── Filter / KPI / cohort content lives inside the Cohort tab ────────────────
+# ─── Sidebar filter setup ─────────────────────────────────────────────────────
 sectors = sorted([s for s in screen[CANON["sector"]].dropna().unique() if str(s).strip()])
-cohort_options = [c for c in COHORTS.keys() if c in screen["Cohort"].unique()]
+listed_options = ["ASX Listed", "Private & Unlisted"]
 sbti_options = ["Yes", "No"]
+nger_options = ["Yes", "No"]
 asrs_tiers_present = [t for t in ["Tier 1", "Tier 1 (proxy)", "Tier 2", "Tier 2 (proxy)", "Tier 3", "Unclassified"]
                       if t in screen.get("ASRS Tier", pd.Series(dtype=str)).unique()]
 
 with st.sidebar.expander("🔍 Filters", expanded=False):
     st.caption("**Filters** — change any to narrow the view; defaults show all companies.")
+    f_listed = st.multiselect(
+        "Listed",
+        listed_options,
+        default=[],
+        key="ftr_listed",
+        help="ASX Listed = traded on the ASX. Private & Unlisted = private companies and NGER reporters.",
+    )
     f_sbti = st.multiselect(
         "SBTi target",
         sbti_options,
         default=[],
         key="ftr_sbti",
-        help=(
-            "Yes = company has an SBTi entry (validated, committed, or removed).\n"
-            "No = no SBTi entry — covers ASX 200 without SBTi targets and "
-            "the NGER-reporter universe."
-        ),
+        help="Yes = company has an SBTi entry (validated, committed, or removed).\nNo = no SBTi engagement.",
+    )
+    f_nger = st.multiselect(
+        "NGER reporter",
+        nger_options,
+        default=[],
+        key="ftr_nger",
+        help="Yes = company reports under the National Greenhouse and Energy Reporting Act, or is covered under the Safeguard Mechanism (100kt threshold implies NGER obligation).",
     )
     f_tier = st.multiselect(
-        "AASB S2 / ASRS reporting tier",
+        "ASRS reporting tier",
         asrs_tiers_present,
         default=[],
         key="ftr_tier",
         help=(
-            "Per AASB S2 Climate-related Disclosures (the Australian ISSB-aligned standard).\n\n"
-            "**Tier 1**: meets ≥2 of A$500M revenue / A$1B assets / 500 employees.\n"
-            "**Tier 2**: meets ≥2 of A$200M / A$500M / 250.\n"
-            "**Tier 3**: meets ≥2 of A$50M / A$25M / 100.\n\n"
-            "**(proxy)** = revenue/assets/employees not on file; tier inferred."
+            "AASB S2 Climate-related Disclosures reporting tier.\n\n"
+            "**Tier 1**: ≥2 of A$500M revenue / A$1B assets / 500 employees.\n"
+            "**Tier 2**: ≥2 of A$200M / A$500M / 500 employees.\n"
+            "**Tier 3**: ≥2 of A$50M / A$25M / 100 employees.\n\n"
+            "**(proxy)** = financial data not on file; tier estimated from market cap."
         ),
     )
     search = st.text_input("🔍 Search by company name", key="ftr_search")
     if st.button("↻ Clear filters", use_container_width=True):
         for k in ("ftr_search", "ftr_sector", "ftr_priority", "ftr_yrs",
-                  "ftr_mq", "ftr_cp", "ftr_delivery", "ftr_cohort", "ftr_tier",
-                  "ftr_sbti"):
+                  "ftr_mq", "ftr_cp", "ftr_delivery", "ftr_listed", "ftr_tier",
+                  "ftr_sbti", "ftr_nger"):
             if k in st.session_state:
                 del st.session_state[k]
         st.rerun()
     with st.expander("More filters", expanded=False):
-        f_cohort = st.multiselect(
-            "Companies (detailed)",
-            cohort_options,
-            default=[],
-            key="ftr_cohort",
-            help="Source group — usually the SBTi Yes/No filter is enough.",
-        )
         f_sector = st.multiselect("Sector", sectors, key="ftr_sector")
         f_priority = st.radio(
             "Outreach priority",
@@ -557,12 +561,15 @@ active_filters: list[str] = []
 filtered = screen.copy()
 total_in_cohort = len(filtered)
 
+if f_listed:
+    filtered = filtered[filtered["Listed"].isin(f_listed)]
+    active_filters.append(f"Listed: {', '.join(f_listed)}")
 if f_sbti:
     filtered = filtered[filtered["SBTi"].isin(f_sbti)]
     active_filters.append(f"SBTi: {', '.join(f_sbti)}")
-if f_cohort:
-    filtered = filtered[filtered["Cohort"].isin(f_cohort)]
-    active_filters.append(f"Companies: {len(f_cohort)} selected")
+if f_nger:
+    filtered = filtered[filtered["NGER Reporter"].isin(f_nger)]
+    active_filters.append(f"NGER: {', '.join(f_nger)}")
 if f_tier:
     filtered = filtered[filtered.get("ASRS Tier", pd.Series([""] * len(filtered))).isin(f_tier)]
     active_filters.append(f"ASRS Tier: {', '.join(f_tier)}")
@@ -1164,8 +1171,10 @@ with tab_asrs:
     display_cols = [c for c in [
         CANON["company"],
         "ASX Code",
+        "Listed",
         CANON["sector"],
         "ASRS Group",
+        "NGER Reporter",
         CANON["near_term_status"],
         target_col or "Target Classification",
         "Near-term Target (short)",
@@ -1197,9 +1206,17 @@ with tab_asrs:
                 "ASX Code",
                 help="ASX ticker code. Blank for private companies not listed on the ASX.",
             ),
+            "Listed": st.column_config.TextColumn(
+                "Listed",
+                help="ASX Listed = traded on the Australian Securities Exchange. Private & Unlisted = private companies, foreign-owned subsidiaries, and NGER reporters not on ASX.",
+            ),
             CANON["sector"]: st.column_config.TextColumn(
                 "Sector",
                 help="GICS or SBTi sector classification used to determine applicable guidance.",
+            ),
+            "NGER Reporter": st.column_config.TextColumn(
+                "NGER Reporter",
+                help="Yes = company reports under the National Greenhouse and Energy Reporting Act (threshold: 25kt CO₂e scope 1+2 or 200TJ energy), or is covered under the Safeguard Mechanism (100kt threshold). NGER reporters are likely ASRS in-scope regardless of ASX listing.",
             ),
             "ASRS Group": st.column_config.TextColumn(
                 "ASRS Group",
