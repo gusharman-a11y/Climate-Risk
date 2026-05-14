@@ -568,8 +568,12 @@ if f_sbti:
     filtered = filtered[filtered["SBTi"].isin(f_sbti)]
     active_filters.append(f"SBTi: {', '.join(f_sbti)}")
 if f_nger:
-    filtered = filtered[filtered["NGER Reporter"].isin(f_nger)]
-    active_filters.append(f"NGER: {', '.join(f_nger)}")
+    if "Yes" in f_nger and "No" not in f_nger:
+        filtered = filtered[filtered["NGER Reporter"].str.startswith("Yes")]
+        active_filters.append("NGER: Yes")
+    elif "No" in f_nger and "Yes" not in f_nger:
+        filtered = filtered[filtered["NGER Reporter"] == "No"]
+        active_filters.append("NGER: No")
 if f_tier:
     filtered = filtered[filtered.get("ASRS Tier", pd.Series([""] * len(filtered))).isin(f_tier)]
     active_filters.append(f"ASRS Tier: {', '.join(f_tier)}")
@@ -1187,8 +1191,9 @@ with tab_asrs:
         "Safeguard Surrendered (tCO2e)",
         "Voluntary Retirements (ACCUs)",
         "Research Source URL",
-        "Data Source",
-        "BD Priority Score",
+        "Profile Source",
+        "BD Priority",
+        "BD Rationale",
     ] if c and c in view.columns]
 
     st.markdown(f"**{len(view)} companies** match current filters")
@@ -1216,7 +1221,12 @@ with tab_asrs:
             ),
             "NGER Reporter": st.column_config.TextColumn(
                 "NGER Reporter",
-                help="Yes = company reports under the National Greenhouse and Energy Reporting Act (threshold: 25kt CO₂e scope 1+2 or 200TJ energy), or is covered under the Safeguard Mechanism (100kt threshold). NGER reporters are likely ASRS in-scope regardless of ASX listing.",
+                help=(
+                    "Whether the company is an NGER reporter, and the basis:\n\n"
+                    "• 'Yes — NGER register': appears directly in the NGER register (≥25kt CO₂e or ≥200TJ energy).\n"
+                    "• 'Yes — Safeguard (inferred)': covered under the Safeguard Mechanism (≥100kt CO₂e), which implies NGER obligation. Not all Safeguard-covered companies will show NGER data separately.\n"
+                    "• 'No': not identified as an NGER reporter from available data — may still be in scope at lower thresholds."
+                ),
             ),
             "ASRS Group": st.column_config.TextColumn(
                 "ASRS Group",
@@ -1290,20 +1300,31 @@ with tab_asrs:
                 "Source",
                 help="Link to the sustainability report or SBTi disclosure used as the primary data source.",
             ),
-            "Data Source": st.column_config.TextColumn(
-                "Data source",
-                help="Primary data source: SBTi register or research overlay (manual/PDF/URL ingest).",
-            ),
-            "BD Priority Score": st.column_config.ProgressColumn(
-                "BD Priority",
-                min_value=0,
-                max_value=15,
-                format="%d",
+            "Profile Source": st.column_config.TextColumn(
+                "Profile Source",
                 help=(
-                    "Composite BD priority score (0–15). Higher = stronger outreach case. "
-                    "Factors: ASRS group urgency, missing validated target, Safeguard coverage, "
-                    "target proximity, and voluntary retirement activity."
+                    "Where this company's climate profile data comes from:\n\n"
+                    "• 'SBTi Companies Taking Action': sourced directly from the SBTi public register.\n"
+                    "• 'ASX 200 research cohort': manually researched for ASX 200 companies without SBTi targets.\n"
+                    "• 'NGER register': sourced from the National Greenhouse and Energy Reporting dataset.\n"
+                    "• '+ research overlay': target data has been updated or enriched with verified external research (PDF/URL)."
                 ),
+            ),
+            "BD Priority": st.column_config.TextColumn(
+                "BD Priority",
+                help=(
+                    "Overall BD priority based on two factors:\n\n"
+                    "1. ASRS reporting urgency (Group 1 = reporting now, Group 2 = FY2026/27, Group 3 = FY2027/28)\n"
+                    "2. Climate target gap (No public target = critical gap; Targets set = low urgency)\n\n"
+                    "🔴 Critical = Group 1 + no/weak target\n"
+                    "🟠 High = Group 1 with some target, or Group 2 with weak/no target\n"
+                    "🟡 Medium = Group 2–3 with partial target\n"
+                    "🟢 Low = validated SBTi target in place"
+                ),
+            ),
+            "BD Rationale": st.column_config.TextColumn(
+                "BD Rationale",
+                help="Plain-English explanation of why this company is (or isn't) a BD priority. Combines ASRS reporting deadline with climate target gap. Safe to paste into a client prep note or BD briefing.",
             ),
         },
     )

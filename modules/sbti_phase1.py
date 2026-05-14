@@ -383,15 +383,27 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
     else:
         out["Safeguard"] = ""
         out["Safeguard Covered (tCO2e)"] = None
-    # NGER Reporter flag — "Yes" for companies in the NGER-only cohort or matched
-    # to the NGER dataset; "No" otherwise.
-    out["NGER Reporter"] = out["Cohort"].map(
-        lambda c: "Yes" if c == "NGER reporters (not in cohort)" else "No"
-    )
-    # Also flag SBTi + ASX200 companies that appear in the Safeguard register
-    # as likely NGER reporters (Safeguard threshold 100kt > NGER threshold 25kt)
-    if "Safeguard" in out.columns:
-        out.loc[out["Safeguard"] == "Yes", "NGER Reporter"] = "Yes"
+    # NGER Reporter flag with basis note
+    def _nger_flag(row: pd.Series) -> str:
+        if row.get("Cohort") == "NGER reporters (not in cohort)":
+            return "Yes — NGER register"
+        if str(row.get("Safeguard", "")) == "Yes":
+            return "Yes — Safeguard (inferred)"
+        return "No"
+    out["NGER Reporter"] = out.apply(_nger_flag, axis=1)
+
+    # Profile Source — where did this company's climate data come from?
+    _SOURCE_MAP = {
+        "ASX listed (SBTi)": "SBTi Companies Taking Action",
+        "Australian Corporate / FI (SBTi, private)": "SBTi Companies Taking Action",
+        "ASX 200 — no SBTi target": "ASX 200 research cohort",
+        "NGER reporters (not in cohort)": "NGER register",
+    }
+    out["Profile Source"] = out["Cohort"].map(_SOURCE_MAP).fillna("Research")
+    # Flag companies where the research overlay updated the target data
+    if "Research Source URL" in out.columns:
+        has_overlay = out["Research Source URL"].notna() & (out["Research Source URL"].str.strip() != "")
+        out.loc[has_overlay, "Profile Source"] = out.loc[has_overlay, "Profile Source"] + " + research overlay"
     return out
 
 
