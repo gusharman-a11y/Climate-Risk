@@ -32,6 +32,7 @@ from modules.phase2 import (
     upsert_record,
 )
 from modules.scraper import (
+    debug_extract,
     fetch_and_parse,
     fetch_pdf,
     load_stored_urls,
@@ -832,6 +833,39 @@ with tab_company:
                 with st.spinner("Parsing…"):
                     parsed_seed = parse_emissions(pdf_up.getvalue())
                 seed_source = "pdf-upload"
+                # If parser got nothing useful, show debug dump so user can diagnose
+                if parsed_seed and parsed_seed.get("s1") is None and parsed_seed.get("s2") is None:
+                    with st.expander("🔍 Nothing found — show raw PDF extraction (debug)", expanded=True):
+                        st.caption(
+                            "The parser couldn't find Scope 1/2/3 values. "
+                            "Check below to see what pdfplumber extracted. "
+                            "Common causes: image-based PDF (scanned), non-standard "
+                            "table layout, or numbers reported in Mt not t."
+                        )
+                        with st.spinner("Extracting debug info…"):
+                            dbg = debug_extract(pdf_up.getvalue(), max_pages=15)
+                        if dbg.get("error"):
+                            st.error(dbg["error"])
+                        else:
+                            st.info(
+                                f"{dbg['total_pages']} pages total — showing first 15. "
+                                f"Total text chars extracted: {dbg['text_chars']:,}. "
+                                + ("⚠️ Very low char count — likely a scanned/image PDF. "
+                                   "You'll need to enter emissions manually below."
+                                   if dbg['text_chars'] < 500 else
+                                   "Text found — the layout may be non-standard. "
+                                   "Check the table dumps below.")
+                            )
+                            for p in dbg["pages"][:8]:
+                                with st.expander(f"Page {p['page']}", expanded=False):
+                                    if p["text"].strip():
+                                        st.text(p["text"][:1500])
+                                    for ti, tbl in enumerate(p["tables"][:2]):
+                                        st.caption(f"Table {ti+1}")
+                                        try:
+                                            st.dataframe(pd.DataFrame(tbl), hide_index=True)
+                                        except Exception:
+                                            st.text(str(tbl)[:400])
 
         with ing_tab2:
             st.caption(
@@ -907,7 +941,8 @@ with tab_company:
                         "(e.g. base year instead of current), copy the right value "
                         "into the form below."
                     )
-                    cand_df = pd.DataFrame(ec)[["scope", "year", "value", "row_text"]]
+                    ec_cols = [c for c in ["scope", "year", "value", "raw_value", "unit", "is_total", "row_text"] if c in pd.DataFrame(ec).columns]
+                    cand_df = pd.DataFrame(ec)[ec_cols]
                     cand_df = cand_df.sort_values(
                         ["scope", "year"], ascending=[True, False], na_position="last"
                     )
