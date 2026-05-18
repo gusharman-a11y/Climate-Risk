@@ -1428,7 +1428,7 @@ def _render_australia() -> None:
         _SEP_YE = {"ANZ", "NAB", "WBC", "BOQ", "BEN"}
         _MAR_YE = {"MQG"}
 
-        def _fy_end(asx_code: str) -> str:
+        def _fy_end(asx_code: str) -> str | None:
             c = str(asx_code).strip().upper()
             if c in _DEC_YE:
                 return "31 Dec"
@@ -1436,7 +1436,7 @@ def _render_australia() -> None:
                 return "30 Sep"
             if c in _MAR_YE:
                 return "31 Mar"
-            return "30 Jun"
+            return None  # unknown — don't show a guess
 
         def _first_asrs_report(asrs_group: str, fy_end: str) -> str:
             """First mandatory ASRS report period (financial year + approx due date)."""
@@ -1482,12 +1482,12 @@ def _render_australia() -> None:
         # ── Enrich screen with ASRS + CER columns ────────────────────────────────
         asrs_df = add_asrs_columns(screen).copy()
         asrs_df["FY Year End"] = asrs_df["ASX Code"].apply(
-            lambda c: _fy_end(str(c)) if pd.notna(c) else "30 Jun"
+            lambda c: _fy_end(str(c)) if pd.notna(c) else None
         )
         asrs_df["First ASRS Report"] = asrs_df.apply(
             lambda r: _first_asrs_report(
                 str(r.get("ASRS Group", "")),
-                str(r.get("FY Year End", "30 Jun")),
+                str(r.get("FY Year End") or "30 Jun"),  # fall back for calculation only
             ),
             axis=1,
         )
