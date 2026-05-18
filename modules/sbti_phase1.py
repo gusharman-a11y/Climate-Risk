@@ -280,25 +280,50 @@ def best_target_year(row: pd.Series) -> tuple[int | None, str]:
 
 # ASX-listed Australian companies whose SBTi records carry no AU ISIN
 # (data-quality miss in the SBTi dataset). Hand-curated.
+# These all have Country = "Australia" in the SBTi register but a non-AU ISIN.
 ASX_ALLOWLIST = {
-    "Xero",                          # NZ ISIN, but ASX:XRO dual-listed
+    "Xero",                          # NZ ISIN (NZ9429063010S2), ASX:XRO dual-listed
     "MoneyMe Limited",               # ASX:MME
     "Pro-Pac Packaging Limited",     # ASX:PPG
     "Pro-Pac Packaging",
 }
 
+# Companies with active SBTi targets registered under a NON-Australian country
+# because they are incorporated outside Australia but have significant ASX
+# presence and Australian ASRS Group 1 reporting obligations.
+# Key: ISIN as it appears in the SBTi register (may not start with AU).
+ASX_ISIN_OVERRIDES: set[str] = {
+    "JE00BJ1F3079",   # Amcor plc — Country=Switzerland, ASX:AMC — Targets set
+}
+# Companies where the SBTi register has no ISIN (company-name-only match).
+ASX_COMPANY_OVERRIDES: set[str] = {
+    "News Corp",              # Country=USA (US65249B2088), ASX:NWS CDI — Targets set
+    "Atlassian Corporation",  # Country=USA, no ISIN, Nasdaq:TEAM / ASX CDI — Targets set
+}
+# ── Latent risk (no current SBTi target but would be missed if they commit) ──
+# Rio Tinto plc  — ISIN GB0007188757, Country=United Kingdom in SBTi register.
+# Rio Tinto Limited (AU000000RIO1) would be caught by the AU ISIN filter.
+# No action needed until commitment is made; documented here for awareness.
+
 
 def filter_asx(df: pd.DataFrame) -> pd.DataFrame:
-    """ASX-listed cohort: Australian SBTi entries with an AU ISIN, plus a
-    hand-curated allow-list of dual-listed/missing-ISIN ASX entities."""
+    """ASX-listed cohort: Australian SBTi entries with an AU ISIN, plus
+    hand-curated allowlists for:
+      - Australian-country entries with non-AU ISINs (ASX_ALLOWLIST)
+      - Non-Australian-country entries for companies with ASX presence and
+        Australian ASRS Group 1 obligations (ASX_ISIN_OVERRIDES /
+        ASX_COMPANY_OVERRIDES)
+    """
     if df.empty:
         return df
     country = df[CANON["country"]].astype(str).str.strip().str.lower()
     isin = df[CANON["isin"]].astype(str).str.strip().str.upper()
     company = df[CANON["company"]].astype(str).str.strip()
-    mask_isin = country.eq("australia") & isin.str.startswith("AU")
-    mask_allow = country.eq("australia") & company.isin(ASX_ALLOWLIST)
-    return df[mask_isin | mask_allow].copy()
+    mask_isin       = country.eq("australia") & isin.str.startswith("AU")
+    mask_allow      = country.eq("australia") & company.isin(ASX_ALLOWLIST)
+    mask_isin_ovr   = isin.isin(ASX_ISIN_OVERRIDES)
+    mask_comp_ovr   = company.isin(ASX_COMPANY_OVERRIDES)
+    return df[mask_isin | mask_allow | mask_isin_ovr | mask_comp_ovr].copy()
 
 
 def filter_au_private(df: pd.DataFrame) -> pd.DataFrame:
@@ -311,7 +336,12 @@ def filter_au_private(df: pd.DataFrame) -> pd.DataFrame:
     isin = df[CANON["isin"]].astype(str).str.strip().str.upper()
     company = df[CANON["company"]].astype(str).str.strip()
     org = df[CANON["org_type"]].astype(str).str.strip().str.lower()
-    in_asx = country.eq("australia") & (isin.str.startswith("AU") | company.isin(ASX_ALLOWLIST))
+    # Exclude everything already captured by filter_asx (including ISIN/company overrides)
+    in_asx = (
+        (country.eq("australia") & (isin.str.startswith("AU") | company.isin(ASX_ALLOWLIST)))
+        | isin.isin(ASX_ISIN_OVERRIDES)
+        | company.isin(ASX_COMPANY_OVERRIDES)
+    )
     is_au = country.eq("australia")
     has_org = org.isin({"corporate", "financial institution", "sme"})
     return df[is_au & ~in_asx & has_org].copy()
