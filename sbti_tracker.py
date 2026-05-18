@@ -985,9 +985,9 @@ def _render_australia() -> None:
     if active_filters:
         st.caption("Active filters: " + " · ".join(active_filters))
 
-    (tab_company, tab_asrs, tab_safeguard,
+    (tab_asrs, tab_safeguard, tab_company,
      tab_insights, tab_brief, tab_rulebook, tab_methodology) = st.tabs([
-        "🔍 Company drill-down", "🏢 Company Profile", "🏭 Safeguard Register",
+        "🏢 Company Profile", "🏭 Safeguard Register", "🔍 Company drill-down",
         "💡 BD Insights", "📋 Company Brief", "📚 Sector rulebook", "📖 Methodology",
     ])
 
