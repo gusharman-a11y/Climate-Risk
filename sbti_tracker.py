@@ -1145,7 +1145,7 @@ with tab_asrs:
     st.markdown("---")
 
     # ── Filters ───────────────────────────────────────────────────────────────
-    fc1, fc2, fc3, fc4 = st.columns(4)
+    fc1, fc2, fc3, fc4, fc5 = st.columns([2, 2, 2, 2, 1])
     with fc1:
         f_asrs_group = st.multiselect(
             "ASRS Group", ["Group 1", "Group 2", "Group 3", "Unclassified"],
@@ -1158,8 +1158,16 @@ with tab_asrs:
         tc_opts = sorted(asrs_df[target_col].dropna().unique()) if target_col else []
         f_target = st.multiselect("Target classification", tc_opts, key="asrs_screen_target")
     with fc4:
-        f_sfg_only = st.checkbox("Safeguard-covered only", key="asrs_sfg_only")
-        f_vol_only = st.checkbox("Has voluntary retirements", key="asrs_vol_only")
+        f_sbti_tab = st.multiselect(
+            "SBTi",
+            ["Yes", "No"],
+            default=[],
+            key="asrs_screen_sbti",
+            help="Yes = company has an SBTi entry (validated, committed, or removed). No = no SBTi engagement.",
+        )
+    with fc5:
+        f_sfg_only = st.checkbox("Safeguard only", key="asrs_sfg_only")
+        f_vol_only = st.checkbox("Has voluntary", key="asrs_vol_only")
 
     view = asrs_df.copy()
     if f_asrs_group:
@@ -1168,6 +1176,8 @@ with tab_asrs:
         view = view[view[CANON["sector"]].isin(f_sector)]
     if f_target and target_col:
         view = view[view[target_col].isin(f_target)]
+    if f_sbti_tab and "SBTi" in view.columns:
+        view = view[view["SBTi"].isin(f_sbti_tab)]
     if f_sfg_only and "Safeguard" in view.columns:
         view = view[view["Safeguard"] == "Yes"]
     if f_vol_only:
