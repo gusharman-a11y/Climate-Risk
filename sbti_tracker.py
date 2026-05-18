@@ -2299,13 +2299,13 @@ def _render_country_profile_tab(
 
 
 with tab_philippines:
-    from modules.pse import fetch_pse_companies, PSE_SECTOR_ORDER, PSE_SECTOR_COLORS
+    from modules.pse import load_pse_companies, get_pse_board, PSE_SECTOR_ORDER, PSE_SECTOR_COLORS
     from modules.country_profile import filter_sbti_country
 
-    @st.cache_data(show_spinner="Fetching PSE company directory…", ttl=3600)
+    @st.cache_data(show_spinner="Loading PSE company directory…", ttl=3600)
     def _load_pse() -> pd.DataFrame:
         try:
-            return fetch_pse_companies(max_pages=10)
+            return load_pse_companies()
         except Exception as exc:
             return pd.DataFrame({"error": [str(exc)]})
 
@@ -2316,7 +2316,7 @@ with tab_philippines:
         st.markdown("### 🇵🇭 Philippines — BD Company Profile")
         st.error(
             f"Could not load PSE directory: {err}\n\n"
-            "The PSE Edge API may be temporarily unavailable. Try refreshing the page."
+            "Check that data/pse_companies.csv is present, or that the PSE Edge API is reachable."
         )
     else:
         st.markdown("### 🇵🇭 Philippines — BD Company Profile")
@@ -2331,12 +2331,6 @@ with tab_philippines:
 
         sbti_ph = _pse_sbti(hash(tuple(sbti_df["Company Name"].dropna().astype(str).tolist())))
 
-        def _pse_tier(row: pd.Series) -> str:
-            sector = str(row.get("Sector", "")).strip()
-            if sector == "Small, Medium & Emerging Board":
-                return "PSE SME Board"
-            return "PSE Main Board"
-
         _render_country_profile_tab(
             country_label="Philippines",
             flag="🇵🇭",
@@ -2344,7 +2338,7 @@ with tab_philippines:
             exchange_df=pse_raw,
             sbti_country_df=sbti_ph,
             exchange_name_col="Company Name",
-            tier_fn=_pse_tier,
+            tier_fn=get_pse_board,
             tier_col_label="PSE Board",
             tier_options=["PSE Main Board", "PSE SME Board"],
             sector_col="Sector",
@@ -2356,8 +2350,9 @@ with tab_philippines:
             },
             download_filename="philippines_bd_profile.csv",
             source_note=(
-                "**Sources:** PSE Edge API (edge.pse.com.ph) · SBTi Companies Taking Action register. "
-                "PSE data refreshed hourly. SBTi matching is fuzzy — verify matches before client use. "
+                "**Sources:** PSE listed company directory · SBTi Companies Taking Action register. "
+                "PSE Board (Main / SME) sourced from PSE official listing data. "
+                "SBTi matching is fuzzy — verify matches before client use. "
                 "Target Classification for non-SBTi companies defaults to 'No public target'; "
                 "this can be improved with a research overlay."
             ),
