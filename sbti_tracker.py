@@ -469,8 +469,8 @@ st.caption(
     "without SBTi targets. Pick a tab to explore."
 )
 
-tab_company, tab_asrs, tab_safeguard, tab_insights, tab_brief, tab_rulebook, tab_methodology = st.tabs(
-    ["🔍 Company drill-down", "🏢 AUS Company Profile", "🏭 Safeguard Register", "💡 BD Insights", "📋 Company Brief", "📚 Sector rulebook", "📖 Methodology"]
+tab_company, tab_asrs, tab_safeguard, tab_insights, tab_brief, tab_rulebook, tab_methodology, tab_philippines = st.tabs(
+    ["🔍 Company drill-down", "🏢 AUS Company Profile", "🏭 Safeguard Register", "💡 BD Insights", "📋 Company Brief", "📚 Sector rulebook", "📖 Methodology", "🇵🇭 Philippines"]
 )
 
 # ─── Sidebar filter setup ─────────────────────────────────────────────────────
@@ -2069,3 +2069,177 @@ with st.sidebar.expander("ℹ️ Methodology"):
         "against the linear-path required reduction implied by each company's "
         "own committed target."
     )
+
+
+# ─── Philippines tab ──────────────────────────────────────────────────────────
+
+with tab_philippines:
+    from modules.pse import fetch_pse_companies, PSE_SECTOR_ORDER, PSE_SECTOR_COLORS
+
+    st.markdown("### 🇵🇭 Philippines — PSE Listed Company Universe")
+    st.caption(
+        "All companies listed on the Philippine Stock Exchange (PSE), sourced live from "
+        "the PSE Edge API. Use this as the company universe for Philippines BD research. "
+        "Climate target / SBTi data is not yet overlaid for Philippine companies."
+    )
+
+    @st.cache_data(show_spinner="Fetching PSE company directory…", ttl=3600)
+    def _load_pse() -> pd.DataFrame:
+        try:
+            return fetch_pse_companies(max_pages=10)
+        except Exception as exc:
+            return pd.DataFrame({"error": [str(exc)]})
+
+    pse_df = _load_pse()
+
+    if pse_df.empty or "error" in pse_df.columns:
+        err = pse_df["error"].iloc[0] if "error" in pse_df.columns else "Unknown error"
+        st.error(
+            f"Could not load PSE directory: {err}\n\n"
+            "The PSE Edge API may be temporarily unavailable. Try refreshing the page."
+        )
+    else:
+        # ── KPI row ────────────────────────────────────────────────────────────
+        n_companies = len(pse_df)
+        n_sectors = pse_df["Sector"].nunique() if "Sector" in pse_df.columns else 0
+        latest_listing = (
+            pse_df["Listing Date"].max().strftime("%b %Y")
+            if "Listing Date" in pse_df.columns and pse_df["Listing Date"].notna().any()
+            else "—"
+        )
+        oldest_listing = (
+            pse_df["Listing Date"].min().strftime("%Y")
+            if "Listing Date" in pse_df.columns and pse_df["Listing Date"].notna().any()
+            else "—"
+        )
+        n_property = int((pse_df.get("Sector", pd.Series()) == "Property").sum())
+        n_industrial = int((pse_df.get("Sector", pd.Series()) == "Industrial").sum())
+
+        pk1, pk2, pk3, pk4, pk5 = st.columns(5)
+        pk1.metric("Total PSE-listed", f"{n_companies:,}")
+        pk2.metric("Sectors", f"{n_sectors}")
+        pk3.metric("Most recent listing", latest_listing)
+        pk4.metric("Industrial", f"{n_industrial}",
+                   help="Industrial sector companies (manufacturing, energy, food, construction).")
+        pk5.metric("Property", f"{n_property}",
+                   help="Property sector including REITs.")
+
+        st.markdown("---")
+
+        # ── Sector chart ───────────────────────────────────────────────────────
+        if "Sector" in pse_df.columns:
+            sector_counts = (
+                pse_df["Sector"].value_counts()
+                .reindex([s for s in PSE_SECTOR_ORDER if s in pse_df["Sector"].unique()])
+                .dropna()
+                .reset_index()
+            )
+            sector_counts.columns = ["Sector", "Count"]
+            fig_sector = go.Figure(go.Bar(
+                x=sector_counts["Sector"],
+                y=sector_counts["Count"],
+                marker_color=[PSE_SECTOR_COLORS.get(s, "#94A3B8") for s in sector_counts["Sector"]],
+                text=sector_counts["Count"],
+                textposition="outside",
+            ))
+            fig_sector.update_layout(
+                height=300,
+                margin=dict(l=10, r=10, t=30, b=80),
+                plot_bgcolor="white", paper_bgcolor="white",
+                font=dict(family="Inter, Helvetica, sans-serif", size=11),
+                xaxis=dict(tickangle=-30),
+                yaxis=dict(title="Companies"),
+                title="PSE companies by sector",
+            )
+            st.plotly_chart(fig_sector, use_container_width=True)
+
+        # ── Filters ────────────────────────────────────────────────────────────
+        pf1, pf2, pf3 = st.columns([2, 2, 3])
+        with pf1:
+            sector_opts = sorted(pse_df["Sector"].dropna().unique()) if "Sector" in pse_df.columns else []
+            f_pse_sector = st.multiselect("Sector", sector_opts, key="pse_sector")
+        with pf2:
+            # Subsector options filtered by selected sectors
+            sub_pool = pse_df.copy()
+            if f_pse_sector and "Sector" in sub_pool.columns:
+                sub_pool = sub_pool[sub_pool["Sector"].isin(f_pse_sector)]
+            sub_opts = sorted(sub_pool["Subsector"].dropna().unique()) if "Subsector" in sub_pool.columns else []
+            f_pse_sub = st.multiselect("Subsector", sub_opts, key="pse_sub")
+        with pf3:
+            pse_search = st.text_input("🔍 Search company name or symbol", key="pse_search")
+
+        view_pse = pse_df.copy()
+        if f_pse_sector and "Sector" in view_pse.columns:
+            view_pse = view_pse[view_pse["Sector"].isin(f_pse_sector)]
+        if f_pse_sub and "Subsector" in view_pse.columns:
+            view_pse = view_pse[view_pse["Subsector"].isin(f_pse_sub)]
+        if pse_search:
+            mask = (
+                view_pse.get("Company Name", pd.Series()).astype(str).str.contains(pse_search, case=False, na=False)
+                | view_pse.get("Symbol", pd.Series()).astype(str).str.contains(pse_search, case=False, na=False)
+            )
+            view_pse = view_pse[mask]
+
+        st.caption(f"Showing **{len(view_pse):,}** of {n_companies:,} companies")
+
+        # ── Company table ──────────────────────────────────────────────────────
+        display_cols_pse = [c for c in [
+            "Company Name", "Symbol", "Sector", "Subsector", "Listing Date", "PSE Link"
+        ] if c in view_pse.columns]
+
+        col_cfg_pse = {
+            "Company Name": st.column_config.TextColumn("Company Name", width="large"),
+            "Symbol": st.column_config.TextColumn("Symbol", width="small"),
+            "Sector": st.column_config.TextColumn("Sector", width="medium"),
+            "Subsector": st.column_config.TextColumn("Subsector", width="medium"),
+            "Listing Date": st.column_config.DateColumn("Listed", format="DD MMM YYYY", width="small"),
+            "PSE Link": st.column_config.LinkColumn("PSE →", display_text="View", width="small"),
+        }
+
+        st.dataframe(
+            view_pse[display_cols_pse].reset_index(drop=True),
+            use_container_width=True,
+            hide_index=True,
+            height=550,
+            column_config=col_cfg_pse,
+        )
+
+        # ── Subsector breakdown (when sector filtered) ─────────────────────────
+        if f_pse_sector and "Subsector" in view_pse.columns and not view_pse.empty:
+            st.markdown("---")
+            st.markdown("**Subsector breakdown**")
+            sub_counts = view_pse["Subsector"].value_counts().reset_index()
+            sub_counts.columns = ["Subsector", "Count"]
+            fig_sub = go.Figure(go.Bar(
+                x=sub_counts["Subsector"],
+                y=sub_counts["Count"],
+                marker_color="#0369A1",
+                text=sub_counts["Count"],
+                textposition="outside",
+            ))
+            fig_sub.update_layout(
+                height=280,
+                margin=dict(l=10, r=10, t=20, b=100),
+                plot_bgcolor="white", paper_bgcolor="white",
+                font=dict(family="Inter, Helvetica, sans-serif", size=11),
+                xaxis=dict(tickangle=-40),
+            )
+            st.plotly_chart(fig_sub, use_container_width=True)
+
+        # ── Download ───────────────────────────────────────────────────────────
+        st.download_button(
+            "⬇ Download PSE company list (CSV)",
+            view_pse[display_cols_pse].to_csv(index=False).encode("utf-8"),
+            file_name="pse_listed_companies.csv",
+            mime="text/csv",
+        )
+
+        st.markdown("---")
+        st.caption(
+            "**Source:** Philippine Stock Exchange Edge API "
+            "(edge.pse.com.ph/companyDirectory/search.ax). "
+            "Refreshed hourly. "
+            "PSE links open the company's trading page on the PSE Edge portal. "
+            "Climate target and SBTi data for Philippine companies is not yet available "
+            "in this tracker — raise with the research team to prioritise."
+        )
