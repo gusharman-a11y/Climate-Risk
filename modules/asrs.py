@@ -42,7 +42,7 @@ GROUP_2 = AsrsGroup(
     mandatory_from="2026-07-01",
     revenue_aud=200_000_000,
     assets_aud=500_000_000,
-    employees=500,
+    employees=250,   # s292A Corporations Act: 250 employees (not 500)
 )
 
 GROUP_3 = AsrsGroup(

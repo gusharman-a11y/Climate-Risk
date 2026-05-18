@@ -158,7 +158,7 @@ class AsrsThresholds:
 
 
 GROUP_1 = AsrsThresholds(500_000_000, 1_000_000_000, 500)
-GROUP_2 = AsrsThresholds(200_000_000, 500_000_000, 500)   # employees corrected: 250 → 500
+GROUP_2 = AsrsThresholds(200_000_000, 500_000_000, 250)   # s292A Corporations Act: 250 employees
 GROUP_3 = AsrsThresholds(50_000_000, 25_000_000, 100)     # new — mandatory from 1 Jul 2027
 
 
