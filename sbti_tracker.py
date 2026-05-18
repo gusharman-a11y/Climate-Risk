@@ -469,8 +469,8 @@ st.caption(
     "without SBTi targets. Pick a tab to explore."
 )
 
-tab_company, tab_asrs, tab_safeguard, tab_insights, tab_brief, tab_rulebook = st.tabs(
-    ["🔍 Company drill-down", "🏢 AUS Company Profile", "🏭 Safeguard Register", "💡 BD Insights", "📋 Company Brief", "📚 Sector rulebook"]
+tab_company, tab_asrs, tab_safeguard, tab_insights, tab_brief, tab_rulebook, tab_methodology = st.tabs(
+    ["🔍 Company drill-down", "🏢 AUS Company Profile", "🏭 Safeguard Register", "💡 BD Insights", "📋 Company Brief", "📚 Sector rulebook", "📖 Methodology"]
 )
 
 # ─── Sidebar filter setup ─────────────────────────────────────────────────────
@@ -1518,6 +1518,66 @@ with tab_safeguard:
                 mime="text/csv",
             )
 
+            # ── Heatmap: Emitter × ACCU Method Type ─────────────────────────
+            st.markdown("#### Compliance Surrenders — Heatmap")
+            st.caption(
+                "Colour intensity = ACCUs surrendered. "
+                "Rows = top emitters by total surrenders; columns = ACCU method type. "
+                "Hover for exact volume."
+            )
+            hm_top_n = st.slider(
+                "Emitters to show", 5, min(40, len(pivot_wide)), min(25, len(pivot_wide)),
+                key="sfg_hm_top_n",
+            )
+            hm_cols = method_cols + other_cols  # numeric method columns only
+            hm_data = pivot_wide.head(hm_top_n).copy()
+            hm_z = hm_data[[c for c in hm_cols if c in hm_data.columns]].values.tolist()
+            hm_y = hm_data["responsible_emitter"].tolist()
+            hm_x = [c for c in hm_cols if c in hm_data.columns]
+
+            # Custom text labels on cells (show "—" for zero, "Xk" for thousands)
+            def _hm_text(v):
+                try:
+                    f = float(v)
+                    if f == 0:
+                        return ""
+                    return f"{f/1000:.0f}k" if f >= 1000 else f"{f:.0f}"
+                except Exception:
+                    return ""
+
+            hm_text = [[_hm_text(v) for v in row] for row in hm_z]
+
+            fig_hm = go.Figure(data=go.Heatmap(
+                z=hm_z,
+                x=hm_x,
+                y=hm_y,
+                text=hm_text,
+                texttemplate="%{text}",
+                colorscale=[
+                    [0.0, "#F0F9FF"],
+                    [0.2, "#BAE6FD"],
+                    [0.5, "#38BDF8"],
+                    [0.8, "#0369A1"],
+                    [1.0, "#0C4A6E"],
+                ],
+                hovertemplate=(
+                    "<b>%{y}</b><br>%{x}<br>%{z:,.0f} ACCUs<extra></extra>"
+                ),
+                colorbar=dict(title="ACCUs surrendered", thickness=14),
+                xgap=2,
+                ygap=1,
+            ))
+            fig_hm.update_layout(
+                height=max(350, hm_top_n * 24 + 80),
+                margin=dict(l=10, r=10, t=30, b=60),
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                font=dict(family="Inter, Helvetica, sans-serif", size=10),
+                xaxis=dict(side="bottom", tickangle=-30),
+                yaxis=dict(autorange="reversed"),
+            )
+            st.plotly_chart(fig_hm, use_container_width=True)
+
             st.markdown("---")
 
         if sfg_full is None or sfg_full.empty:
@@ -1778,6 +1838,220 @@ with tab_rulebook:
         for r in SECTOR_RULES
     ])
     st.dataframe(rb, use_container_width=True, hide_index=True, height=520)
+
+
+with tab_methodology:
+    st.markdown("### 📖 Methodology — How We Built the Company Universe")
+    st.caption(
+        "This page explains the data sources, inclusion criteria, and analytical frameworks "
+        "behind every number in this tracker. Share with colleagues before they use the data."
+    )
+
+    st.markdown("---")
+
+    # ── Company Universe ──────────────────────────────────────────────────────
+    st.markdown("#### Company Universe")
+
+    n_total = len(screen)
+    n_asx  = int((screen.get("Listed", pd.Series()) == "ASX Listed").sum())
+    n_priv = int((screen.get("Listed", pd.Series()) == "Private & Unlisted").sum())
+    n_sbti = int((screen.get("SBTi", pd.Series()) == "Yes").sum())
+    n_sfg  = int(screen.get("Safeguard", pd.Series()).eq("Yes").sum()) if "Safeguard" in screen.columns else 0
+
+    mu1, mu2, mu3, mu4, mu5 = st.columns(5)
+    mu1.metric("Total companies", f"{n_total:,}")
+    mu2.metric("ASX Listed", f"{n_asx:,}")
+    mu3.metric("Private & Unlisted", f"{n_priv:,}")
+    mu4.metric("SBTi participants", f"{n_sbti:,}")
+    mu5.metric("Safeguard-covered", f"{n_sfg:,}")
+
+    st.markdown("""
+The tracker covers four cohorts that together represent the material corporate climate
+disclosure universe for Australian-focused BD work:
+
+| Cohort | Source | Inclusion criterion | Listed status |
+|--------|--------|---------------------|---------------|
+| **ASX Listed — SBTi** | SBTi Companies Taking Action register | Australian company, ASX-listed, any SBTi status | ASX Listed |
+| **Private & Unlisted — SBTi** | SBTi Companies Taking Action register | Australian company, not ASX-listed, any SBTi status | Private & Unlisted |
+| **ASX 200 — no SBTi target** | ASX 200 research cohort (manually compiled) | In ASX 200; no SBTi entry; researched target status | ASX Listed |
+| **NGER reporters** | National Greenhouse and Energy Reporting register | NGER-obligated entity not already in the above cohorts | Private & Unlisted |
+
+For display purposes, cohorts are simplified to **ASX Listed** and **Private & Unlisted** in the
+AUS Company Profile tab, with SBTi participation as a separate filter.
+""")
+
+    st.markdown("---")
+
+    # ── Data Sources ──────────────────────────────────────────────────────────
+    st.markdown("#### Data Sources")
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.markdown("""
+**🌐 SBTi Companies Taking Action**
+- Publisher: Science Based Targets initiative
+- URL: [sciencebasedtargets.org/companies-taking-action](https://sciencebasedtargets.org/companies-taking-action)
+- Update cadence: Approx. monthly
+- What we use: Company name, ISIN, sector, near-term target status, near-term target wording, net-zero commitment, target year
+- Filtering applied: Country = Australia + New Zealand; all SBTi statuses included (Targets set, Committed, Commitment removed)
+
+**📋 ASX 200 Research Cohort**
+- Publisher: Pollination internal research
+- What we use: Company name, ASX code, sector, target classification (6-tier), near-term target text, net-zero year, research source URL
+- Coverage: Large-cap ASX companies without an SBTi entry
+- Limitation: Manually maintained — may lag latest disclosures by 1–3 months
+""")
+    with col_b:
+        st.markdown("""
+**🏭 CER Safeguard Mechanism Register**
+- Publisher: Clean Energy Regulator (CER)
+- URL: [cer.gov.au/markets/reports-and-data](https://cer.gov.au/markets/reports-and-data)
+- File: `baselines-and-emissions.csv`
+- What we use: Facility name, responsible emitter, state, baseline, covered emissions, ACCUs/SMCs surrendered, net position
+- Threshold: 100 kt CO₂e covered emissions (FY2024-25 register)
+
+**🌿 CER ANREU Voluntary Cancellations**
+- Publisher: Clean Energy Regulator (CER)
+- File: `voluntary-cancellations.csv`
+- What we use: Entity name, number of ACCUs voluntarily cancelled (retired)
+- Matching: Fuzzy name matching against cohort companies (normalise legal suffixes, first-token + overlap rule)
+
+**📊 NGER Register**
+- Publisher: Clean Energy Regulator (CER) — NGER Act
+- What we use: Facility-level NGER reporters to identify large private companies not captured by SBTi or ASX research
+""")
+
+    st.markdown("---")
+
+    # ── ASRS Grouping ─────────────────────────────────────────────────────────
+    st.markdown("#### ASRS Group Assignment (Mandatory Climate Reporting)")
+    st.markdown("""
+Under the **Corporations Amendment (Sustainability Reporting) Act 2024**, Australian entities
+must prepare AASB S2 Climate-related Financial Disclosures. Entities are assigned to one of
+three groups based on meeting **≥ 2 of 3** size thresholds:
+
+| | Group 1 | Group 2 | Group 3 |
+|---|---|---|---|
+| **Mandatory from** | 1 Jan 2025 | 1 Jul 2026 | 1 Jul 2027 |
+| **First report covers** | FY2025/26 | FY2026/27 | FY2027/28 |
+| **Revenue (AUD)** | ≥ $500M | ≥ $200M | ≥ $50M |
+| **Gross assets (AUD)** | ≥ $1B | ≥ $500M | ≥ $25M |
+| **Employees** | ≥ 500 | ≥ 500 | ≥ 100 |
+
+**How groups are assigned in this tracker:**
+1. If verified financial data (revenue / assets / employees) is on file → apply the thresholds directly
+2. If no financial data → proxy from **Market Cap Tier** (ASX convention: Mega >$10B → Group 1; Large $2–10B → Group 1; Mid $300M–$2B → Group 2; Small/Micro → Group 3)
+3. If neither is available → **Unclassified**
+
+Cells showing "(proxy)" indicate a market-cap-based estimate, not verified financials.
+""")
+
+    st.markdown("---")
+
+    # ── Target Classification ─────────────────────────────────────────────────
+    st.markdown("#### Target Classification Taxonomy")
+    st.markdown("""
+Every company is assigned to one of six target classification tiers, ordered from most to
+least climate-aligned. The classification drives the BD Priority calculation.
+
+| Classification | Meaning | BD urgency |
+|---|---|---|
+| **Targets set** | Validated SBTi near-term target in place | Low — monitor for V2 reset or delivery gap |
+| **SBTi committed** | Intent letter submitted to SBTi; validation pending | Low-medium — target pending validation |
+| **Quantitative non-validated** | Has a specific quantitative target (e.g. "50% by 2030") but not SBTi-validated | Medium — needs pathway support |
+| **Net-zero only** | Net-zero long-term commitment but no near-term science-based target | Medium-high — near-term gap |
+| **Aspirational** | Vague qualitative commitment ("working towards net zero") | High — no credible pathway |
+| **No public target** | No publicly available climate commitment | Critical — ASRS disclosure without any strategy |
+
+SBTi status (Targets set / Committed / Commitment removed / blank) is pulled directly from the
+SBTi register. The remaining classifications are assigned through Pollination research for the
+ASX 200 non-SBTi cohort.
+""")
+
+    st.markdown("---")
+
+    # ── BD Priority ───────────────────────────────────────────────────────────
+    st.markdown("#### BD Priority")
+    st.markdown("""
+BD Priority combines **ASRS reporting urgency** and **climate target gap** into a single signal:
+
+```
+BD Priority Score = Target Classification Urgency × ASRS Group Multiplier
+```
+
+| Target classification | Urgency score |
+|---|---|
+| No public target | 5 |
+| Aspirational | 4 |
+| Net-zero only | 3 |
+| Quantitative non-validated | 2 |
+| SBTi committed | 1 |
+| Targets set | 0 |
+
+| ASRS Group | Multiplier |
+|---|---|
+| Group 1 | × 3 |
+| Group 2 | × 2 |
+| Group 3 / Unclassified | × 1 |
+
+**Priority bands:** 🔴 Critical ≥ 12 · 🟠 High ≥ 8 · 🟡 Medium ≥ 4 · 🟢 Low < 4
+
+The **BD Rationale** column translates this into plain English: e.g.
+*"Group 1 — mandatory now (FY2025/26); no public climate target — ASRS disclosure without any strategy"*.
+""")
+
+    st.markdown("---")
+
+    # ── Safeguard Matching ────────────────────────────────────────────────────
+    st.markdown("#### Safeguard & Voluntary Retirement Matching")
+    st.markdown("""
+Safeguard and voluntary retirement data is matched to cohort companies by **fuzzy name matching**:
+
+1. **Normalise** — strip legal suffixes (Limited, Ltd, Pty, Group, Holdings, Corporation, Australia),
+   lowercase, collapse whitespace
+2. **Exact match** — normalised company key = normalised emitter key
+3. **First-token + overlap match** — same first word AND ≥ 2 tokens in common (or min(2, len) tokens
+   if the company name is short)
+4. **Prefix match** — emitter name starts with the first 6+ characters of the company key
+
+Limitations: matching fails for companies that operate under a completely different trading name
+vs legal entity name (e.g. subsidiaries with distinct brands). Where a Safeguard match is
+unexpected, check the **Safeguard Covered** column against the CER register directly.
+""")
+
+    st.markdown("---")
+
+    # ── What's Not Captured ───────────────────────────────────────────────────
+    st.markdown("#### Known Gaps")
+    st.markdown("""
+| Gap | Why | Workaround |
+|---|---|---|
+| **Financed emissions** (banks, super funds) | Scope 3 Cat. 15 not in Safeguard register; no AU mandatory financed-emissions dataset yet | Covered by sector filter — Financial Services companies in cohort via SBTi/ASX 200 |
+| **Small-cap ASX companies** (outside ASX 200) | Not manually researched | ASRS Group 3 from 2027; low BD priority currently |
+| **Private companies below NGER threshold** | No public disclosure obligation below 25 kt Scope 1+2 | Not material for Safeguard/ASRS BD work |
+| **Non-Australian multinationals** | Tracker scoped to AU-domiciled entities | International parent companies excluded by design |
+| **SBTi data lag** | SBTi register updated ~monthly; between updates, new commitments may not appear | Check [sciencebasedtargets.org](https://sciencebasedtargets.org/companies-taking-action) for latest |
+
+Last data refresh: see sidebar → 📁 Data sources for upload dates.
+""")
+
+    st.markdown("---")
+
+    # ── NGER Reporter Logic ───────────────────────────────────────────────────
+    st.markdown("#### NGER Reporter Column Logic")
+    st.markdown("""
+The **NGER Reporter** column has three possible values:
+
+- **Yes — NGER register**: Company was added to the tracker because it appeared in the NGER
+  reporters file (cohort = "NGER reporters (not in cohort)")
+- **Yes — Safeguard (inferred)**: Company is in the SBTi or ASX 200 cohort AND has a matched
+  Safeguard facility. All Safeguard-covered entities are NGER-obligated (Safeguard threshold
+  100 kt CO₂e is well above NGER's 25 kt threshold)
+- **No**: No evidence of NGER obligation from either the NGER register or the Safeguard register
+
+Note: A company showing "NGER Yes + Safeguard No" is not an error — it means the company
+files NGER reports (likely 25–100 kt range) but does not cross the 100 kt Safeguard threshold.
+""")
 
 
 st.sidebar.markdown("---")
