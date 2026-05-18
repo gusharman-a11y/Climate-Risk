@@ -469,8 +469,8 @@ st.caption(
     "without SBTi targets. Pick a tab to explore."
 )
 
-tab_company, tab_asrs, tab_safeguard, tab_insights, tab_brief, tab_rulebook, tab_methodology, tab_philippines = st.tabs(
-    ["🔍 Company drill-down", "🏢 AUS Company Profile", "🏭 Safeguard Register", "💡 BD Insights", "📋 Company Brief", "📚 Sector rulebook", "📖 Methodology", "🇵🇭 Philippines"]
+tab_company, tab_asrs, tab_safeguard, tab_insights, tab_brief, tab_rulebook, tab_methodology, tab_philippines, tab_malaysia = st.tabs(
+    ["🔍 Company drill-down", "🏢 AUS Company Profile", "🏭 Safeguard Register", "💡 BD Insights", "📋 Company Brief", "📚 Sector rulebook", "📖 Methodology", "🇵🇭 Philippines", "🇲🇾 Malaysia"]
 )
 
 # ─── Sidebar filter setup ─────────────────────────────────────────────────────
@@ -2073,15 +2073,234 @@ with st.sidebar.expander("ℹ️ Methodology"):
 
 # ─── Philippines tab ──────────────────────────────────────────────────────────
 
+def _render_country_profile_tab(
+    country_label: str,
+    flag: str,
+    exchange_label: str,
+    exchange_df: pd.DataFrame,
+    sbti_country_df: pd.DataFrame,
+    exchange_name_col: str,
+    tier_fn,
+    tier_col_label: str,
+    tier_options: list[str],
+    sector_col: str,
+    extra_display_cols: list[str],
+    extra_col_config: dict,
+    download_filename: str,
+    source_note: str,
+    link_col: str | None = None,
+):
+    """Shared renderer for the Philippines and Malaysia BD profile tabs.
+
+    Renders directly into the calling tab context (caller must be inside the
+    correct ``with tab_XXX:`` block).  Builds an AUS-style company profile view
+    with SBTi overlay, target classification, BD priority scoring, and filters.
+    """
+    from modules.country_profile import build_country_profile
+    from modules.sbti import CANON as _CANON
+
+    # Build enriched profile
+    @st.cache_data(show_spinner=f"Building {country_label} BD profile…", ttl=1800)
+    def _build_profile(
+        _exch_hash: int, _sbti_hash: int,
+        _exch_name_col: str, _tier_col: str,
+    ) -> pd.DataFrame:
+        return build_country_profile(
+            exchange_df, sbti_country_df,
+            exchange_name_col=_exch_name_col,
+            tier_fn=tier_fn,
+            tier_col_label=_tier_col,
+        )
+
+    profile = _build_profile(
+        hash(tuple(exchange_df["Company Name"].dropna().astype(str).tolist())),
+        hash(tuple(sbti_country_df["Company Name"].dropna().astype(str).tolist())
+             if not sbti_country_df.empty else ()),
+        exchange_name_col,
+        tier_col_label,
+    )
+
+    # ── KPI row ────────────────────────────────────────────────────────────────
+    n_total = len(profile)
+    n_sbti = int((profile.get("SBTi", pd.Series()) == "Yes").sum())
+    sbti_rate = f"{n_sbti / n_total * 100:.1f}%" if n_total else "—"
+    n_no_target = int((profile.get("Target Classification", pd.Series()) == "No public target").sum())
+    n_critical = int((profile.get("BD Priority", pd.Series()) == "🔴 Critical").sum())
+
+    pk1, pk2, pk3, pk4, pk5 = st.columns(5)
+    pk1.metric(f"Total {exchange_label}", f"{n_total:,}")
+    pk2.metric("SBTi engaged", f"{n_sbti}",
+               help="Companies with an entry in the SBTi Companies Taking Action register.")
+    pk3.metric("SBTi rate", sbti_rate,
+               help="Share of listed companies with any SBTi engagement.")
+    pk4.metric("No public target", f"{n_no_target}",
+               delta="BD prospects", delta_color="inverse",
+               help="Companies with no public climate target — strongest BD signal.")
+    pk5.metric("🔴 Critical priority", f"{n_critical}",
+               help="Critical BD priority: large-cap + no/weak climate target.")
+
+    st.markdown("---")
+
+    # ── Summary chart: companies by tier and target status ─────────────────────
+    if "Target Classification" in profile.columns and tier_col_label in profile.columns:
+        _tc_order = ["No public target", "Aspirational", "Net-zero only",
+                     "Quantitative non-validated", "SBTi committed", "Targets set"]
+        grp_summary = (
+            profile.groupby([tier_col_label, "Target Classification"])
+            .size().reset_index(name="count")
+        )
+        fig_summary = go.Figure()
+        for tc in sorted(grp_summary["Target Classification"].unique(),
+                         key=lambda x: _tc_order.index(x) if x in _tc_order else 99):
+            sub = grp_summary[grp_summary["Target Classification"] == tc]
+            fig_summary.add_trace(go.Bar(
+                x=sub[tier_col_label], y=sub["count"], name=tc,
+            ))
+        fig_summary.update_layout(
+            barmode="stack", height=260,
+            margin=dict(l=10, r=10, t=30, b=10),
+            plot_bgcolor="white", paper_bgcolor="white",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            font=dict(family="Inter, Helvetica, sans-serif", size=11),
+            title=f"Companies by {tier_col_label} and target status",
+        )
+        st.plotly_chart(fig_summary, use_container_width=True)
+
+    # ── Filters ────────────────────────────────────────────────────────────────
+    _fkey = country_label.lower().replace(" ", "_")
+    ff1, ff2, ff3, ff4, ff5 = st.columns([2, 2, 2, 2, 1])
+    with ff1:
+        f_tier = st.multiselect(tier_col_label, tier_options, key=f"{_fkey}_tier")
+    with ff2:
+        sec_opts = sorted(profile[sector_col].dropna().unique()) if sector_col in profile.columns else []
+        f_sector = st.multiselect("Sector", sec_opts, key=f"{_fkey}_sector")
+    with ff3:
+        tc_opts = sorted(profile["Target Classification"].dropna().unique()) if "Target Classification" in profile.columns else []
+        f_target = st.multiselect("Target classification", tc_opts, key=f"{_fkey}_target")
+    with ff4:
+        f_sbti = st.multiselect("SBTi", ["Yes", "No"], key=f"{_fkey}_sbti",
+                                help="Yes = company has an SBTi entry. No = no SBTi engagement.")
+    with ff5:
+        f_search = st.text_input("🔍 Search", key=f"{_fkey}_search")
+
+    view = profile.copy()
+    if f_tier and tier_col_label in view.columns:
+        view = view[view[tier_col_label].isin(f_tier)]
+    if f_sector and sector_col in view.columns:
+        view = view[view[sector_col].isin(f_sector)]
+    if f_target and "Target Classification" in view.columns:
+        view = view[view["Target Classification"].isin(f_target)]
+    if f_sbti and "SBTi" in view.columns:
+        view = view[view["SBTi"].isin(f_sbti)]
+    if f_search:
+        mask = view["Company Name"].astype(str).str.contains(f_search, case=False, na=False)
+        view = view[mask]
+    if "BD Priority Score" in view.columns:
+        view = view.sort_values("BD Priority Score", ascending=False)
+
+    # Truncate near-term target text
+    if _CANON["target"] in view.columns:
+        view = view.copy()
+        view["Near-term Target (short)"] = (
+            view[_CANON["target"]].astype(str).str[:120]
+            .where(view[_CANON["target"]].notna(), "—")
+        )
+
+    st.markdown(f"**{len(view)} companies** match current filters")
+
+    # ── Main table ─────────────────────────────────────────────────────────────
+    _base_cols = [
+        "Company Name",
+        tier_col_label,
+        sector_col,
+        "SBTi",
+        _CANON["near_term_status"],
+        "Target Classification",
+        "Near-term Target (short)",
+        _CANON["net_zero_year"],
+        "BD Priority",
+        "BD Rationale",
+        "Profile Source",
+    ]
+    display_cols = [c for c in _base_cols + extra_display_cols
+                    if c and c in view.columns]
+    if link_col and link_col in view.columns and link_col not in display_cols:
+        display_cols.append(link_col)
+
+    _base_col_config = {
+        "Company Name": st.column_config.TextColumn("Company", width="large"),
+        tier_col_label: st.column_config.TextColumn(
+            tier_col_label,
+            help="Exchange tier / market segment used for BD priority weighting.",
+        ),
+        sector_col: st.column_config.TextColumn("Sector"),
+        "SBTi": st.column_config.TextColumn(
+            "SBTi",
+            help="Yes = company has an entry in the SBTi Companies Taking Action register.",
+        ),
+        _CANON["near_term_status"]: st.column_config.TextColumn(
+            "SBTi Status",
+            help="Targets set / Committed / Commitment removed.",
+        ),
+        "Target Classification": st.column_config.TextColumn(
+            "Target Classification",
+            help="Six-tier BD target classification from No public target → Targets set.",
+        ),
+        "Near-term Target (short)": st.column_config.TextColumn(
+            "Near-term Target",
+            help="SBTi near-term target wording (truncated to 120 chars).",
+        ),
+        _CANON["net_zero_year"]: st.column_config.NumberColumn(
+            "Net-Zero Year", format="%d",
+            help="Year the company has committed to reach net-zero emissions.",
+        ),
+        "BD Priority": st.column_config.TextColumn(
+            "BD Priority",
+            help=(
+                "BD priority combining exchange tier and climate target gap.\n\n"
+                "🔴 Critical = large-cap + no/weak target\n"
+                "🟠 High = mid-cap + weak target\n"
+                "🟡 Medium = any tier with partial target\n"
+                "🟢 Low = SBTi validated"
+            ),
+        ),
+        "BD Rationale": st.column_config.TextColumn(
+            "BD Rationale",
+            help="Plain-English BD rationale combining reporting deadline and target gap.",
+        ),
+        "Profile Source": st.column_config.TextColumn(
+            "Profile Source",
+            help="SBTi Companies Taking Action = matched to SBTi register. Exchange listing only = no SBTi match found.",
+        ),
+    }
+    if link_col:
+        _base_col_config[link_col] = st.column_config.LinkColumn(
+            "Exchange →", display_text="View", width="small"
+        )
+    col_config = {**_base_col_config, **extra_col_config}
+
+    st.dataframe(
+        view[display_cols].reset_index(drop=True),
+        use_container_width=True,
+        hide_index=True,
+        height=520,
+        column_config=col_config,
+    )
+
+    st.download_button(
+        f"⬇ Download {country_label} BD Profile (CSV)",
+        view[display_cols].to_csv(index=False).encode("utf-8"),
+        file_name=download_filename,
+        mime="text/csv",
+    )
+
+    st.markdown("---")
+    st.caption(source_note)
+
+
 with tab_philippines:
     from modules.pse import fetch_pse_companies, PSE_SECTOR_ORDER, PSE_SECTOR_COLORS
-
-    st.markdown("### 🇵🇭 Philippines — PSE Listed Company Universe")
-    st.caption(
-        "All companies listed on the Philippine Stock Exchange (PSE), sourced live from "
-        "the PSE Edge API. Use this as the company universe for Philippines BD research. "
-        "Climate target / SBTi data is not yet overlaid for Philippine companies."
-    )
+    from modules.country_profile import filter_sbti_country
 
     @st.cache_data(show_spinner="Fetching PSE company directory…", ttl=3600)
     def _load_pse() -> pd.DataFrame:
@@ -2090,156 +2309,147 @@ with tab_philippines:
         except Exception as exc:
             return pd.DataFrame({"error": [str(exc)]})
 
-    pse_df = _load_pse()
+    pse_raw = _load_pse()
 
-    if pse_df.empty or "error" in pse_df.columns:
-        err = pse_df["error"].iloc[0] if "error" in pse_df.columns else "Unknown error"
+    if pse_raw.empty or "error" in pse_raw.columns:
+        err = pse_raw["error"].iloc[0] if "error" in pse_raw.columns else "Unknown error"
+        st.markdown("### 🇵🇭 Philippines — BD Company Profile")
         st.error(
             f"Could not load PSE directory: {err}\n\n"
             "The PSE Edge API may be temporarily unavailable. Try refreshing the page."
         )
     else:
-        # ── KPI row ────────────────────────────────────────────────────────────
-        n_companies = len(pse_df)
-        n_sectors = pse_df["Sector"].nunique() if "Sector" in pse_df.columns else 0
-        latest_listing = (
-            pse_df["Listing Date"].max().strftime("%b %Y")
-            if "Listing Date" in pse_df.columns and pse_df["Listing Date"].notna().any()
-            else "—"
-        )
-        oldest_listing = (
-            pse_df["Listing Date"].min().strftime("%Y")
-            if "Listing Date" in pse_df.columns and pse_df["Listing Date"].notna().any()
-            else "—"
-        )
-        n_property = int((pse_df.get("Sector", pd.Series()) == "Property").sum())
-        n_industrial = int((pse_df.get("Sector", pd.Series()) == "Industrial").sum())
-
-        pk1, pk2, pk3, pk4, pk5 = st.columns(5)
-        pk1.metric("Total PSE-listed", f"{n_companies:,}")
-        pk2.metric("Sectors", f"{n_sectors}")
-        pk3.metric("Most recent listing", latest_listing)
-        pk4.metric("Industrial", f"{n_industrial}",
-                   help="Industrial sector companies (manufacturing, energy, food, construction).")
-        pk5.metric("Property", f"{n_property}",
-                   help="Property sector including REITs.")
-
-        st.markdown("---")
-
-        # ── Sector chart ───────────────────────────────────────────────────────
-        if "Sector" in pse_df.columns:
-            sector_counts = (
-                pse_df["Sector"].value_counts()
-                .reindex([s for s in PSE_SECTOR_ORDER if s in pse_df["Sector"].unique()])
-                .dropna()
-                .reset_index()
-            )
-            sector_counts.columns = ["Sector", "Count"]
-            fig_sector = go.Figure(go.Bar(
-                x=sector_counts["Sector"],
-                y=sector_counts["Count"],
-                marker_color=[PSE_SECTOR_COLORS.get(s, "#94A3B8") for s in sector_counts["Sector"]],
-                text=sector_counts["Count"],
-                textposition="outside",
-            ))
-            fig_sector.update_layout(
-                height=300,
-                margin=dict(l=10, r=10, t=30, b=80),
-                plot_bgcolor="white", paper_bgcolor="white",
-                font=dict(family="Inter, Helvetica, sans-serif", size=11),
-                xaxis=dict(tickangle=-30),
-                yaxis=dict(title="Companies"),
-                title="PSE companies by sector",
-            )
-            st.plotly_chart(fig_sector, use_container_width=True)
-
-        # ── Filters ────────────────────────────────────────────────────────────
-        pf1, pf2, pf3 = st.columns([2, 2, 3])
-        with pf1:
-            sector_opts = sorted(pse_df["Sector"].dropna().unique()) if "Sector" in pse_df.columns else []
-            f_pse_sector = st.multiselect("Sector", sector_opts, key="pse_sector")
-        with pf2:
-            # Subsector options filtered by selected sectors
-            sub_pool = pse_df.copy()
-            if f_pse_sector and "Sector" in sub_pool.columns:
-                sub_pool = sub_pool[sub_pool["Sector"].isin(f_pse_sector)]
-            sub_opts = sorted(sub_pool["Subsector"].dropna().unique()) if "Subsector" in sub_pool.columns else []
-            f_pse_sub = st.multiselect("Subsector", sub_opts, key="pse_sub")
-        with pf3:
-            pse_search = st.text_input("🔍 Search company name or symbol", key="pse_search")
-
-        view_pse = pse_df.copy()
-        if f_pse_sector and "Sector" in view_pse.columns:
-            view_pse = view_pse[view_pse["Sector"].isin(f_pse_sector)]
-        if f_pse_sub and "Subsector" in view_pse.columns:
-            view_pse = view_pse[view_pse["Subsector"].isin(f_pse_sub)]
-        if pse_search:
-            mask = (
-                view_pse.get("Company Name", pd.Series()).astype(str).str.contains(pse_search, case=False, na=False)
-                | view_pse.get("Symbol", pd.Series()).astype(str).str.contains(pse_search, case=False, na=False)
-            )
-            view_pse = view_pse[mask]
-
-        st.caption(f"Showing **{len(view_pse):,}** of {n_companies:,} companies")
-
-        # ── Company table ──────────────────────────────────────────────────────
-        display_cols_pse = [c for c in [
-            "Company Name", "Symbol", "Sector", "Subsector", "Listing Date", "PSE Link"
-        ] if c in view_pse.columns]
-
-        col_cfg_pse = {
-            "Company Name": st.column_config.TextColumn("Company Name", width="large"),
-            "Symbol": st.column_config.TextColumn("Symbol", width="small"),
-            "Sector": st.column_config.TextColumn("Sector", width="medium"),
-            "Subsector": st.column_config.TextColumn("Subsector", width="medium"),
-            "Listing Date": st.column_config.DateColumn("Listed", format="DD MMM YYYY", width="small"),
-            "PSE Link": st.column_config.LinkColumn("PSE →", display_text="View", width="small"),
-        }
-
-        st.dataframe(
-            view_pse[display_cols_pse].reset_index(drop=True),
-            use_container_width=True,
-            hide_index=True,
-            height=550,
-            column_config=col_cfg_pse,
-        )
-
-        # ── Subsector breakdown (when sector filtered) ─────────────────────────
-        if f_pse_sector and "Subsector" in view_pse.columns and not view_pse.empty:
-            st.markdown("---")
-            st.markdown("**Subsector breakdown**")
-            sub_counts = view_pse["Subsector"].value_counts().reset_index()
-            sub_counts.columns = ["Subsector", "Count"]
-            fig_sub = go.Figure(go.Bar(
-                x=sub_counts["Subsector"],
-                y=sub_counts["Count"],
-                marker_color="#0369A1",
-                text=sub_counts["Count"],
-                textposition="outside",
-            ))
-            fig_sub.update_layout(
-                height=280,
-                margin=dict(l=10, r=10, t=20, b=100),
-                plot_bgcolor="white", paper_bgcolor="white",
-                font=dict(family="Inter, Helvetica, sans-serif", size=11),
-                xaxis=dict(tickangle=-40),
-            )
-            st.plotly_chart(fig_sub, use_container_width=True)
-
-        # ── Download ───────────────────────────────────────────────────────────
-        st.download_button(
-            "⬇ Download PSE company list (CSV)",
-            view_pse[display_cols_pse].to_csv(index=False).encode("utf-8"),
-            file_name="pse_listed_companies.csv",
-            mime="text/csv",
-        )
-
-        st.markdown("---")
+        st.markdown("### 🇵🇭 Philippines — BD Company Profile")
         st.caption(
-            "**Source:** Philippine Stock Exchange Edge API "
-            "(edge.pse.com.ph/companyDirectory/search.ax). "
-            "Refreshed hourly. "
-            "PSE links open the company's trading page on the PSE Edge portal. "
-            "Climate target and SBTi data for Philippine companies is not yet available "
-            "in this tracker — raise with the research team to prioritise."
+            "All PSE-listed companies matched against the global SBTi register, with BD priority "
+            "scoring based on exchange tier and climate target gap. Same methodology as AUS Company Profile."
+        )
+
+        @st.cache_data(show_spinner=False)
+        def _pse_sbti(sbti_hash: int) -> pd.DataFrame:
+            return filter_sbti_country(sbti_df, "Philippines", isin_prefix="PH")
+
+        sbti_ph = _pse_sbti(hash(tuple(sbti_df["Company Name"].dropna().astype(str).tolist())))
+
+        def _pse_tier(row: pd.Series) -> str:
+            sector = str(row.get("Sector", "")).strip()
+            if sector == "Small, Medium & Emerging Board":
+                return "PSE SME Board"
+            return "PSE Main Board"
+
+        _render_country_profile_tab(
+            country_label="Philippines",
+            flag="🇵🇭",
+            exchange_label="PSE",
+            exchange_df=pse_raw,
+            sbti_country_df=sbti_ph,
+            exchange_name_col="Company Name",
+            tier_fn=_pse_tier,
+            tier_col_label="PSE Board",
+            tier_options=["PSE Main Board", "PSE SME Board"],
+            sector_col="Sector",
+            extra_display_cols=["Symbol", "Subsector", "Listing Date", "PSE Link"],
+            extra_col_config={
+                "Symbol": st.column_config.TextColumn("Symbol", width="small"),
+                "Subsector": st.column_config.TextColumn("Subsector", width="medium"),
+                "Listing Date": st.column_config.DateColumn("Listed", format="DD MMM YYYY", width="small"),
+            },
+            download_filename="philippines_bd_profile.csv",
+            source_note=(
+                "**Sources:** PSE Edge API (edge.pse.com.ph) · SBTi Companies Taking Action register. "
+                "PSE data refreshed hourly. SBTi matching is fuzzy — verify matches before client use. "
+                "Target Classification for non-SBTi companies defaults to 'No public target'; "
+                "this can be improved with a research overlay."
+            ),
+            link_col="PSE Link",
+        )
+
+
+# ─── Malaysia tab ─────────────────────────────────────────────────────────────
+
+with tab_malaysia:
+    from modules.bursa import (
+        load_bursa_companies, get_bursa_tier,
+        BURSA_MARKET_ORDER, BURSA_MARKET_COLORS, is_available as bursa_available,
+    )
+    from modules.country_profile import filter_sbti_country as _filter_sbti_country
+
+    st.markdown("### 🇲🇾 Malaysia — BD Company Profile")
+    st.caption(
+        "All Bursa-listed companies matched against the global SBTi register, with BD priority "
+        "scoring based on Bursa Market tier and climate target gap. Same methodology as AUS Company Profile."
+    )
+
+    # ── Data source: upload or local file ─────────────────────────────────────
+    _bursa_available = bursa_available()
+
+    if not _bursa_available:
+        st.info(
+            "**Bursa Malaysia company data required.**\n\n"
+            "Bursa Malaysia's public APIs are not available for automated access. "
+            "To enable this tab:\n\n"
+            "1. Go to [Bursa Malaysia Listed Companies](https://www.bursamalaysia.com/market/listed-companies/list-of-listed-company/listed_companies_directory)\n"
+            "2. Download the company list as CSV or Excel\n"
+            "3. Upload it below (or commit to `data/bursa_companies.csv`)"
+        )
+
+    bursa_upload = st.file_uploader(
+        "Upload Bursa Malaysia company list (CSV or Excel)",
+        type=["csv", "xlsx", "xls"],
+        key="bursa_upload",
+        help="Download from the Bursa Malaysia listed companies directory. "
+             "Expected columns: Company Name, Symbol, Market (Main/ACE/LEAP), Sector, ISIN.",
+    )
+
+    @st.cache_data(show_spinner="Loading Bursa company directory…", ttl=3600)
+    def _load_bursa(file_bytes: bytes | None, file_name: str | None) -> pd.DataFrame:
+        import io as _io
+        if file_bytes is not None:
+            buf = _io.BytesIO(file_bytes)
+            buf.name = file_name or "bursa.csv"
+            return load_bursa_companies(buf)
+        return load_bursa_companies(None)
+
+    bursa_raw = _load_bursa(
+        bursa_upload.getvalue() if bursa_upload else None,
+        bursa_upload.name if bursa_upload else None,
+    )
+
+    if bursa_raw.empty:
+        if _bursa_available or bursa_upload:
+            st.error("Could not parse the uploaded file. Check it has Company Name, Symbol, Market, and Sector columns.")
+        # Otherwise the info box above is already showing — nothing more to do
+    else:
+        @st.cache_data(show_spinner=False)
+        def _my_sbti(sbti_hash: int) -> pd.DataFrame:
+            return _filter_sbti_country(sbti_df, "Malaysia", isin_prefix="MY")
+
+        sbti_my = _my_sbti(hash(tuple(sbti_df["Company Name"].dropna().astype(str).tolist())))
+
+        _render_country_profile_tab(
+            country_label="Malaysia",
+            flag="🇲🇾",
+            exchange_label="Bursa",
+            exchange_df=bursa_raw,
+            sbti_country_df=sbti_my,
+            exchange_name_col="Company Name",
+            tier_fn=get_bursa_tier,
+            tier_col_label="Bursa Market",
+            tier_options=BURSA_MARKET_ORDER,
+            sector_col="Sector",
+            extra_display_cols=["Symbol", "ISIN", "Listing Date", "Bursa Link"],
+            extra_col_config={
+                "Symbol": st.column_config.TextColumn("Symbol", width="small"),
+                "ISIN": st.column_config.TextColumn("ISIN", width="medium"),
+                "Listing Date": st.column_config.DateColumn("Listed", format="DD MMM YYYY", width="small"),
+            },
+            download_filename="malaysia_bd_profile.csv",
+            source_note=(
+                "**Sources:** Bursa Malaysia listed companies directory · SBTi Companies Taking Action register. "
+                "Bursa Market tier: Main Market = mandatory Bursa Sustainability Reporting (enhanced from 2023); "
+                "ACE Market = enhanced requirements from 2026; LEAP Market = voluntary. "
+                "SBTi matching is fuzzy — verify matches before client use. "
+                "Target Classification for non-SBTi companies defaults to 'No public target'."
+            ),
+            link_col="Bursa Link",
         )
