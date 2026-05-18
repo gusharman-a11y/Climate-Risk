@@ -350,8 +350,9 @@ def filter_au_private(df: pd.DataFrame) -> pd.DataFrame:
 COHORTS = {
     "ASX listed (SBTi)": filter_asx,
     "Australian Corporate / FI (SBTi, private)": filter_au_private,
-    "ASX 200 — no SBTi target": None,  # Loaded from a separate CSV, not filtered from SBTi data
-    "NGER reporters (not in cohort)": None,  # Loaded from NGER xlsx; large-emitter universe
+    "ASX 200 — no SBTi target": None,        # from data/asx200_non_sbti.csv
+    "NGER reporters (not in cohort)": None,  # from data/nger_*.xlsx
+    "Large private (ATO)": None,             # from data/ato_transparency.xlsx
 }
 
 # Display label mapping: internal cohort key → BD-friendly "Listed" column value
@@ -360,6 +361,7 @@ _COHORT_TO_LISTED = {
     "Australian Corporate / FI (SBTi, private)": "Private & Unlisted",
     "ASX 200 — no SBTi target": "ASX Listed",
     "NGER reporters (not in cohort)": "Private & Unlisted",
+    "Large private (ATO)": "Private & Unlisted",
 }
 
 
@@ -450,6 +452,7 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
         "Australian Corporate / FI (SBTi, private)": "SBTi Companies Taking Action",
         "ASX 200 — no SBTi target": "ASX 200 research cohort",
         "NGER reporters (not in cohort)": "NGER register",
+        "Large private (ATO)": "ATO Tax Transparency",
     }
     out["Profile Source"] = out["Cohort"].map(_SOURCE_MAP).fillna("Research")
     # Flag companies where the research overlay updated the target data
@@ -491,6 +494,26 @@ def build_screen(df: pd.DataFrame, cohort: str = "ASX listed (SBTi)") -> pd.Data
             except Exception:
                 continue
         sub = build_nger_only_cohort(already)
+        if sub.empty:
+            return sub
+        extra = sub.apply(assess_row, axis=1, result_type="expand")
+        out = pd.concat([sub.reset_index(drop=True), extra.reset_index(drop=True)], axis=1)
+        return out
+
+    if cohort == "Large private (ATO)":
+        from modules.ato import build_ato_cohort
+        # Pass all existing cohort names so ATO companies that already appear
+        # elsewhere (SBTi, ASX 200, NGER) are excluded.
+        already = []
+        for other in ("ASX listed (SBTi)", "Australian Corporate / FI (SBTi, private)",
+                      "ASX 200 — no SBTi target", "NGER reporters (not in cohort)"):
+            try:
+                other_sub = build_screen(df, cohort=other)
+                if not other_sub.empty:
+                    already.extend(other_sub["Company Name"].astype(str).tolist())
+            except Exception:
+                continue
+        sub = build_ato_cohort(already)
         if sub.empty:
             return sub
         extra = sub.apply(assess_row, axis=1, result_type="expand")
