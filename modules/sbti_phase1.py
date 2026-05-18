@@ -363,6 +363,28 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
     # Apply researched overlay (verified target data from external web research)
     from modules.researched import apply_overlay
     out = apply_overlay(out)
+
+    # ── Normalise Target Classification to 6-tier taxonomy for SBTi companies ──
+    # The raw SBTi dataset "Target Classification" field contains ambition labels
+    # like "1.5°C aligned" or "Well-Below 2°C" — not the BD 6-tier taxonomy.
+    # Fix this by inferring the correct tier from Near-term Status.  We only touch
+    # rows where the current value is NOT already a valid 6-tier value (i.e., the
+    # research overlay has already set the correct value for researched companies).
+    from modules.country_profile import infer_target_classification as _infer_tc
+    _VALID_TC = {
+        "No public target", "Aspirational", "Net-zero only",
+        "Quantitative non-validated", "SBTi committed", "Targets set",
+    }
+    _needs_tc_fix = (
+        out["SBTi"].eq("Yes")
+        & ~out["Target Classification"].astype(str).str.strip().isin(_VALID_TC)
+    )
+    if _needs_tc_fix.any():
+        _fixed = out[_needs_tc_fix].apply(_infer_tc, axis=1)
+        out.loc[_needs_tc_fix, "Target Classification"] = _fixed
+        out.loc[_needs_tc_fix, "Target Classification (Long)"] = _fixed
+    # ───────────────────────────────────────────────────────────────────────────
+
     # Attach ASX listing data (authoritative — overrides ISIN/proxy logic)
     from modules.asx_listings import attach_asx_listing
     out = attach_asx_listing(out)
