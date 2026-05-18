@@ -56,6 +56,7 @@ from modules.asrs import (
 from modules.company_brief import build_brief
 from modules.voluntary import voluntary_retirements, is_available as voluntary_available
 from modules.safeguard import aggregate as safeguard_aggregate, is_available as safeguard_available
+from modules.nzt import load_nzt, overlay_nzt, NZT_COLS
 
 
 def _column_config():
@@ -180,6 +181,18 @@ with st.sidebar.expander("📁 Data sources", expanded=False):
         type=["csv", "xlsx", "xls"],
         help="Override the bundled SBTi data with a fresh download.",
     )
+    st.markdown("---")
+    st.markdown("**🌍 Net Zero Tracker**")
+    st.caption(
+        "Upload the [Net Zero Tracker](https://zerotracker.net/) snapshot XLSX "
+        "to enrich AUS Company Profile with targets for non-SBTi companies."
+    )
+    nzt_upload = st.file_uploader(
+        "NZT current_snapshot (XLSX)",
+        type=["xlsx", "xls"],
+        key="nzt_upload",
+        help="Download from zerotracker.net → Data → Current snapshot.",
+    )
 
 
 @st.cache_data(show_spinner=False)
@@ -207,6 +220,26 @@ if sbti_df.empty:
 screen = build_all(sbti_df)
 
 emissions_cache = load_cache()
+
+
+@st.cache_data(show_spinner=False)
+def _load_nzt(file_bytes: bytes | None, name: str | None) -> pd.DataFrame:
+    if file_bytes is None:
+        return pd.DataFrame()
+    buf = io.BytesIO(file_bytes)
+    buf.name = name or "nzt.xlsx"
+    return load_nzt(buf)
+
+
+nzt_df = _load_nzt(
+    nzt_upload.getvalue() if nzt_upload else None,
+    nzt_upload.name if nzt_upload else None,
+)
+
+if not nzt_df.empty:
+    st.sidebar.caption(f"✅ NZT loaded — {len(nzt_df)} Australian companies")
+elif nzt_upload:
+    st.sidebar.warning("⚠️ NZT file loaded but no Australian companies found. Check Country = 'AUS' and Entity_type = 'Company'.")
 
 
 # Auto-import a committed NGER spreadsheet if present and not already imported
@@ -1113,6 +1146,10 @@ with tab_asrs:
         lambda n: enrich.loc[n, "vol_retirements"] if n in enrich.index else None
     )
 
+    # ── NZT overlay ───────────────────────────────────────────────────────────
+    if not nzt_df.empty:
+        asrs_df = overlay_nzt(asrs_df, nzt_df)
+
     target_col = next(
         (c for c in ("Target Classification", "Target Classification (BD)") if c in asrs_df.columns),
         None,
@@ -1235,6 +1272,14 @@ with tab_asrs:
         "Safeguard Covered (tCO2e)",
         "Safeguard Surrendered (tCO2e)",
         "Voluntary Retirements (ACCUs)",
+        # NZT overlay columns (only present when NZT file uploaded)
+        "NZT Status",
+        "NZT End Target",
+        "NZT End Year",
+        "NZT Interim %",
+        "NZT Published Plan",
+        "NZT Race to Zero",
+        "NZT Target Classification",
         "Research Source URL",
         "Profile Source",
         "BD Priority",
@@ -1352,7 +1397,8 @@ with tab_asrs:
                     "• 'SBTi Companies Taking Action': sourced directly from the SBTi public register.\n"
                     "• 'ASX 200 research cohort': manually researched for ASX 200 companies without SBTi targets.\n"
                     "• 'NGER register': sourced from the National Greenhouse and Energy Reporting dataset.\n"
-                    "• '+ research overlay': target data has been updated or enriched with verified external research (PDF/URL)."
+                    "• '+ research overlay': target data has been updated or enriched with verified external research (PDF/URL).\n"
+                    "• '+ Net Zero Tracker': Target Classification upgraded using Net Zero Tracker data for non-SBTi companies."
                 ),
             ),
             "BD Priority": st.column_config.TextColumn(
@@ -1370,6 +1416,36 @@ with tab_asrs:
             "BD Rationale": st.column_config.TextColumn(
                 "BD Rationale",
                 help="Plain-English explanation of why this company is (or isn't) a BD priority. Combines ASRS reporting deadline with climate target gap. Safe to paste into a client prep note or BD briefing.",
+            ),
+            "NZT Status": st.column_config.TextColumn(
+                "NZT Status",
+                help="Net Zero Tracker status of end target: 'In corporate strategy', 'Declaration/pledge', or 'Proposed/in discussion'.",
+            ),
+            "NZT End Target": st.column_config.TextColumn(
+                "NZT End Target",
+                help="Type of end target as classified by the Net Zero Tracker (e.g. Net-zero emissions, Carbon neutral).",
+            ),
+            "NZT End Year": st.column_config.NumberColumn(
+                "NZT Year",
+                format="%d",
+                help="Year by which the company has committed to reach its end target.",
+            ),
+            "NZT Interim %": st.column_config.NumberColumn(
+                "NZT Interim %",
+                format="%.0f%%",
+                help="Interim GHG reduction percentage commitment (e.g. 42 = 42% reduction by interim year).",
+            ),
+            "NZT Published Plan": st.column_config.TextColumn(
+                "NZT Plan",
+                help="Whether the company has published a decarbonisation transition plan (Yes/No per NZT).",
+            ),
+            "NZT Race to Zero": st.column_config.TextColumn(
+                "NZT Race to Zero",
+                help="Whether the company is a member of the UN Race to Zero campaign.",
+            ),
+            "NZT Target Classification": st.column_config.TextColumn(
+                "NZT Classification",
+                help="BD Target Classification derived from NZT data (before any upgrade to the main Target Classification column).",
             ),
         },
     )
