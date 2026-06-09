@@ -6,11 +6,12 @@ import type { Company, Signal } from './types'
 export async function getHotSheet(): Promise<Company[]> {
   const { data, error } = await supabase
     .from('companies')
-    .select('*')
+    .select('id,name,asx_code,sector,asrs_group,score_overall,score_asrs,score_target_gap,score_risk,score_intent,score_relationship,top_signal,relationship_status,relationship_lead,pipeline_stage,mandatory_from')
     .not('relationship_status', 'eq', 'current_client')
     .not('pipeline_stage', 'in', '("mandated","negotiation","proposal")')
+    .gt('score_overall', 0)
     .order('score_overall', { ascending: false })
-    .limit(100)
+    .limit(200)
 
   if (error) throw error
   return (data ?? []) as Company[]
@@ -25,7 +26,9 @@ export async function getCompanies(filters?: {
   min_score?: number
   search?: string
 }): Promise<Company[]> {
-  let query = supabase.from('companies').select('*')
+  let query = supabase.from('companies').select(
+    'id,name,asx_code,sector,asrs_group,score_overall,target_classification,relationship_status,relationship_lead,pipeline_stage,mandatory_from'
+  )
 
   if (filters?.asrs_group) query = query.eq('asrs_group', filters.asrs_group)
   if (filters?.sector) query = query.eq('sector', filters.sector)
