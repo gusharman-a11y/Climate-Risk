@@ -61,6 +61,8 @@ export interface Company {
   sbti_status: string | null
   sbti_date_updated: string | null
   target_classification: string | null
+  target_description: string | null
+  target_scope: string | null
   target_year: number | null
   net_zero_year: number | null
   // NZT

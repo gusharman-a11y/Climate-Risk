@@ -120,28 +120,56 @@ export default function CompanyProfileClient({ company: initial, signals }: Prop
 
           {/* Company data */}
           <div className="bg-white border border-[#e6e9ef] rounded-lg p-5">
-            <h2 className="text-sm font-semibold text-slate-700 mb-3">Company Data</h2>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            <h2 className="text-sm font-semibold text-[#323338] mb-4">Climate Target</h2>
+
+            {/* Target description — full text */}
+            {(company as any).target_description && (
+              <div className="mb-4 p-3 bg-[#f6f7fb] rounded-lg border border-[#e6e9ef]">
+                <p className="text-xs text-[#676879] mb-1 font-semibold uppercase tracking-wide">Stated target</p>
+                <p className="text-sm text-[#323338]">{(company as any).target_description}</p>
+                {(company as any).target_scope && (
+                  <p className="text-xs text-[#676879] mt-1">Scope: {(company as any).target_scope}</p>
+                )}
+              </div>
+            )}
+
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
               {[
                 ['SBTi Status', company.sbti_status],
-                ['Target Classification', company.target_classification],
-                ['Target Year', company.target_year],
-                ['Net Zero Year', company.net_zero_year],
-                ['NGER Scope 1', company.nger_scope1_tco2e ? `${(company.nger_scope1_tco2e / 1e6).toFixed(2)} Mt` : null],
-                ['NGER Year', company.nger_year],
-                ['Safeguard Covered', company.safeguard_covered ? 'Yes' : 'No'],
-                ['NZT Status', company.nzt_status],
-                ['NZT End Target', company.nzt_end_target],
-                ['NZT Interim %', company.nzt_interim_pct ? `${company.nzt_interim_pct}%` : null],
-                ['NZT Published Plan', company.nzt_published_plan === null ? null : company.nzt_published_plan ? 'Yes' : 'No'],
-                ['Race to Zero', company.nzt_race_to_zero === null ? null : company.nzt_race_to_zero ? 'Yes' : 'No'],
+                ['SBTi Date', company.sbti_date_updated],
+                ['Classification', company.target_classification],
+                ['Near-term Target Year', company.target_year],
+                ['Net Zero Year', company.nzt_end_year
+                  ? `${company.nzt_end_year} (${company.nzt_end_target ?? 'net zero'})`
+                  : company.net_zero_year ? String(company.net_zero_year) : null],
+                ['NZT Interim Reduction', company.nzt_interim_pct ? `${company.nzt_interim_pct}% reduction` : null],
+                ['Published Plan', company.nzt_published_plan === null ? null : company.nzt_published_plan ? 'Yes' : 'No'],
+                ['Race to Zero', company.nzt_race_to_zero ? 'Member' : null],
               ].map(([label, value]) => value != null ? (
-                <div key={String(label)} className="flex gap-1">
-                  <dt className="text-slate-400 shrink-0">{label}:</dt>
-                  <dd className="text-slate-700 font-medium">{String(value)}</dd>
+                <div key={String(label)} className="flex flex-col gap-0.5">
+                  <dt className="text-[11px] text-[#676879] uppercase tracking-wide font-semibold">{label}</dt>
+                  <dd className="text-sm text-[#323338] font-medium">{String(value)}</dd>
                 </div>
               ) : null)}
             </dl>
+
+            {/* Emissions separator */}
+            <div className="mt-4 pt-4 border-t border-[#e6e9ef]">
+              <h3 className="text-xs font-semibold text-[#676879] uppercase tracking-wide mb-2.5">Emissions Data</h3>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
+                {[
+                  ['NGER Scope 1', company.nger_scope1_tco2e ? `${(company.nger_scope1_tco2e / 1e6).toFixed(2)} Mt CO₂e` : null],
+                  ['NGER Year', company.nger_year],
+                  ['Safeguard Covered', company.safeguard_covered ? 'Yes' : null],
+                  ['Safeguard Baseline', company.safeguard_baseline ? `${(company.safeguard_baseline / 1e6).toFixed(2)} Mt` : null],
+                ].map(([label, value]) => value != null ? (
+                  <div key={String(label)} className="flex flex-col gap-0.5">
+                    <dt className="text-[11px] text-[#676879] uppercase tracking-wide font-semibold">{label}</dt>
+                    <dd className="text-sm text-[#323338] font-medium">{String(value)}</dd>
+                  </div>
+                ) : null)}
+              </dl>
+            </div>
           </div>
 
           {/* Signal timeline */}

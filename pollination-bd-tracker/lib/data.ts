@@ -27,7 +27,7 @@ export async function getCompanies(filters?: {
   search?: string
 }): Promise<Company[]> {
   let query = supabase.from('companies').select(
-    'id,name,asx_code,sector,asrs_group,score_overall,target_classification,relationship_status,relationship_lead,pipeline_stage,mandatory_from'
+    'id,name,asx_code,sector,asrs_group,score_overall,target_classification,target_description,target_scope,relationship_status,relationship_lead,pipeline_stage,mandatory_from'
   )
 
   if (filters?.asrs_group) query = query.eq('asrs_group', filters.asrs_group)

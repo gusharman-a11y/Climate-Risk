@@ -75,8 +75,8 @@ export default function CompaniesClient({ companies }: Props) {
       </div>
 
       {/* Column headers */}
-      <div className="sticky top-[105px] z-10 bg-[#f6f7fb] border-b border-[#e6e9ef] grid grid-cols-[2.5fr_80px_110px_1fr_1fr_130px] px-6 py-2 gap-2">
-        {['Company', 'Score', 'ASRS Group', 'Sector', 'Target', 'Relationship'].map(h => (
+      <div className="sticky top-[105px] z-10 bg-[#f6f7fb] border-b border-[#e6e9ef] grid grid-cols-[2fr_80px_110px_0.8fr_2fr_130px] px-6 py-2 gap-2">
+        {['Company', 'Score', 'ASRS Group', 'Sector', 'Climate Target', 'Relationship'].map(h => (
           <span key={h} className="text-[11px] font-semibold text-[#676879] uppercase tracking-wide">{h}</span>
         ))}
       </div>
@@ -89,7 +89,7 @@ export default function CompaniesClient({ companies }: Props) {
           <Link
             key={company.id}
             href={`/companies/${company.id}`}
-            className={`grid grid-cols-[2.5fr_80px_110px_1fr_1fr_130px] px-6 py-2.5 gap-2 border-b border-[#e6e9ef] hover:bg-[#e8f0fd]/30 transition-colors items-center ${i % 2 === 0 ? 'bg-white' : 'bg-[#fafbff]'}`}
+            className={`grid grid-cols-[2fr_80px_110px_0.8fr_2fr_130px] px-6 py-2.5 gap-2 border-b border-[#e6e9ef] hover:bg-[#e8f0fd]/30 transition-colors items-center ${i % 2 === 0 ? 'bg-white' : 'bg-[#fafbff]'}`}
           >
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[#323338] truncate">{company.name}</p>
@@ -98,7 +98,15 @@ export default function CompaniesClient({ companies }: Props) {
             <div><ScorePill score={company.score_overall} /></div>
             <div><Badge label={gb.label} className={gb.className} /></div>
             <div><p className="text-xs text-[#676879] truncate">{company.sector ?? '—'}</p></div>
-            <div><p className="text-xs text-[#676879] truncate">{company.target_classification ?? '—'}</p></div>
+            <div className="min-w-0">
+              {company.target_description
+                ? <p className="text-xs text-[#323338] truncate font-medium" title={company.target_description}>{company.target_description}</p>
+                : <p className="text-xs text-[#676879] truncate">{company.target_classification ?? '—'}</p>
+              }
+              {company.target_description && company.target_scope && (
+                <p className="text-[10px] text-[#676879]">{company.target_scope}</p>
+              )}
+            </div>
             <div className="flex flex-col gap-0.5">
               <Badge label={rb.label} className={rb.className} />
               {company.relationship_lead && (
