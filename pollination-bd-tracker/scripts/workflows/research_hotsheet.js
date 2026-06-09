@@ -55,17 +55,47 @@ const RESEARCH_SCHEMA = {
   required: ['company_name', 'notable_signals', 'confidence'],
 }
 
-// ── Phase 1: Load companies from args (pre-loaded by run_research.py) ─────────
+// ── Phase 1: Load companies from saved JSON file ───────────────────────────────
 phase('Load')
 
-// args is passed in from run_research.py via _research_args.json
-// Run: py scripts/run_research.py first, then this workflow
-const companies = (args && args.companies) ? args.companies : []
+const ARGS_FILE = 'C:\\Users\\angus.harman\\Climate-Risk\\pollination-bd-tracker\\scripts\\workflows\\_research_args.json'
+
+const loadResult = await agent(
+  'Read the file at this exact path and return its contents parsed as JSON: ' + ARGS_FILE + '\n\nThe file contains a JSON object with a "companies" array. Return the full parsed JSON object including the companies array.',
+  {
+    label: 'Load companies from file',
+    schema: {
+      type: 'object',
+      properties: {
+        companies: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              asx_code: { type: 'string' },
+              sector: { type: 'string' },
+              score_overall: { type: 'number' },
+              asrs_group: { type: 'string' },
+              target_classification: { type: 'string' },
+              sbti_status: { type: 'string' },
+            },
+            required: ['id', 'name'],
+          },
+        },
+      },
+      required: ['companies'],
+    },
+  }
+)
+
+const companies = (loadResult && loadResult.companies) ? loadResult.companies : []
 log('Companies to research: ' + companies.length)
 
 if (companies.length === 0) {
-  log('No companies in args — run: py scripts/run_research.py first')
-  return { error: 'No companies loaded — run py scripts/run_research.py first', results: [] }
+  log('No companies loaded from file — check: ' + ARGS_FILE)
+  return { error: 'No companies loaded', results: [] }
 }
 
 // ── Phase 2: Research each company in parallel ────────────────────────────────
@@ -136,7 +166,7 @@ validResults.forEach(function(result, idx) {
       signalsToSave.push({
         company_id: companyId,
         signal_type: sig.signal_type || 'manual',
-        signal_date: new Date().toISOString().slice(0, 10),
+        signal_date: '2026-06-09',
         headline: sig.headline,
         body: sig.body || null,
         source_url: sig.source_url || result.sustainability_report_url || null,
@@ -152,7 +182,7 @@ validResults.forEach(function(result, idx) {
     signalsToSave.push({
       company_id: companyId,
       signal_type: 'manual',
-      signal_date: new Date().toISOString().slice(0, 10),
+      signal_date: '2026-06-09',
       headline: 'Sustainability report: ' + result.key_actions[0],
       body: result.key_actions.join(' | '),
       source_url: result.sustainability_report_url,
