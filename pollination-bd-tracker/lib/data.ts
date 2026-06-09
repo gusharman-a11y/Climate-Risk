@@ -14,6 +14,7 @@ export async function getHotSheet(): Promise<{ main: Company[]; sbtiV2: Company[
       .not('relationship_status', 'eq', 'current_client')
       .not('pipeline_stage', 'in', '("mandated","negotiation","proposal")')
       .not('sbti_status', 'eq', 'Targets set')
+      .not('asrs_group', 'eq', 'Unclassified')
       .gt('score_overall', 0)
       .order('score_overall', { ascending: false })
       .limit(300),

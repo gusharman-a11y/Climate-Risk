@@ -13,7 +13,7 @@ interface Props {
 }
 
 // ── ASRS groups ───────────────────────────────────────────────────────────────
-const ASRS_GROUPS: AsrsGroup[] = ['Group 1', 'Group 2', 'Group 3', 'Unclassified']
+const ASRS_GROUPS: AsrsGroup[] = ['Group 1', 'Group 2', 'Group 3']
 
 const GROUP_META: Record<AsrsGroup, { sub: string; dot: string }> = {
   'Group 1': { sub: 'Mandatory NOW — FY2025/26', dot: '#e2445c' },
@@ -181,7 +181,6 @@ export default function HotSheetClient({ companies, sbtiV2Companies }: Props) {
             <option value="Group 1">Group 1</option>
             <option value="Group 2">Group 2</option>
             <option value="Group 3">Group 3</option>
-            <option value="Unclassified">Unclassified</option>
           </select>
 
           {/* SBTi filter */}
