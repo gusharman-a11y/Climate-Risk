@@ -129,26 +129,26 @@ export function scoreRowClass(score: number | null): string {
 export function relationshipBadge(status: RelationshipStatus): { label: string; className: string } {
   switch (status) {
     case 'current_client':
-      return { label: 'Current client', className: 'bg-[#00579B] text-white' }
+      return { label: 'Current client', className: 'bg-[#d4f4e2] text-[#007038]' }
     case 'past_client':
-      return { label: 'Past client', className: 'bg-[#10545D] text-white' }
+      return { label: 'Past client', className: 'bg-[#cce5ff] text-[#0060c0]' }
     case 'warm_contact':
-      return { label: 'Warm contact', className: 'bg-amber-100 text-amber-800' }
+      return { label: 'Warm contact', className: 'bg-[#ffe5b4] text-[#c47c00]' }
     default:
-      return { label: 'Cold', className: 'bg-slate-100 text-slate-500' }
+      return { label: 'Cold', className: 'bg-[#f6f7fb] text-[#676879]' }
   }
 }
 
 export function asrsGroupBadge(group: AsrsGroup): { label: string; className: string } {
   switch (group) {
     case 'Group 1':
-      return { label: 'Group 1', className: 'bg-red-100 text-red-700' }
+      return { label: 'Group 1', className: 'bg-[#ffd3d9] text-[#c0253d]' }
     case 'Group 2':
-      return { label: 'Group 2', className: 'bg-orange-100 text-orange-700' }
+      return { label: 'Group 2', className: 'bg-[#ffe5b4] text-[#c47c00]' }
     case 'Group 3':
-      return { label: 'Group 3', className: 'bg-yellow-100 text-yellow-700' }
+      return { label: 'Group 3', className: 'bg-[#fff3cd] text-[#8a6300]' }
     default:
-      return { label: 'Unclassified', className: 'bg-slate-100 text-slate-500' }
+      return { label: 'Unclassified', className: 'bg-[#f6f7fb] text-[#676879]' }
   }
 }
 

@@ -1,20 +1,26 @@
 import type { Metadata } from 'next'
+import { Figtree } from 'next/font/google'
 import './globals.css'
-import Sidebar from '@/components/Sidebar'
+import TopNav from '@/components/TopNav'
+
+const figtree = Figtree({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '800'],
+  variable: '--font-figtree',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
-  title: 'Pollination BD Tracker',
+  title: 'BD Tracker',
   description: 'Australian ASRS business development pipeline',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full antialiased">
-      <body className="flex h-screen overflow-hidden bg-[#F8FAFC]">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
+    <html lang="en" className={figtree.variable}>
+      <body className="min-h-screen bg-[#f6f7fb]" style={{ fontFamily: 'var(--font-figtree), Figtree, sans-serif' }}>
+        <TopNav />
+        <main>{children}</main>
       </body>
     </html>
   )

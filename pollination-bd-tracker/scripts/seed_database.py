@@ -29,8 +29,8 @@ from datetime import date
 
 import pandas as pd
 
-ROOT = Path(__file__).parent.parent
-DATA = ROOT.parent / "Climate-Risk" / "data"  # sibling repo data folder
+ROOT = Path(__file__).parent.parent          # pollination-bd-tracker/
+DATA = ROOT.parent / "data"                  # Climate-Risk/data/
 
 # ── Load .env.local ───────────────────────────────────────────────────────────
 env_path = ROOT / ".env.local"
@@ -41,10 +41,10 @@ if env_path.exists():
             os.environ.setdefault(k.strip(), v.strip())
 
 SUPABASE_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY", "")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("ERROR: Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local")
+    print("ERROR: Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY in .env.local")
     sys.exit(1)
 
 from supabase import create_client  # noqa: E402
@@ -427,10 +427,13 @@ def clean(rec: dict) -> dict:
     """Remove None values that Supabase/JSON dislikes for non-nullable cols."""
     return {k: v for k, v in rec.items() if v is not None or k in ("asx_code",)}
 
-print("Upserting to Supabase…")
+print("Clearing existing data…")
+sb.table("companies").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+
+print("Inserting to Supabase…")
 for i in range(0, len(companies_out), BATCH):
     batch = [clean(r) for r in companies_out[i:i+BATCH]]
-    result = sb.table("companies").upsert(batch, on_conflict="name").execute()
+    sb.table("companies").insert(batch).execute()
     print(f"  Batch {i//BATCH + 1}: {len(batch)} rows")
 
 print("\nDone! Seed complete.")

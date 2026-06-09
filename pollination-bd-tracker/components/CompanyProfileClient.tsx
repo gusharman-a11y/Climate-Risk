@@ -50,39 +50,44 @@ export default function CompanyProfileClient({ company: initial, signals }: Prop
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-6">
-      {/* Back */}
-      <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 mb-4">
-        <ArrowLeft size={14} /> Hot Sheet
-      </Link>
-
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-2xl font-bold text-slate-900">{company.name}</h1>
-            {company.asx_code && (
-              <span className="text-sm font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{company.asx_code}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge label={gb.label} className={gb.className} size="md" />
-            <Badge label={rb.label} className={rb.className} size="md" />
-            {company.sector && <span className="text-sm text-slate-500">{company.sector}</span>}
-            {company.mandatory_from && (
-              <span className="text-xs text-slate-400">Mandatory from {company.mandatory_from}</span>
-            )}
-          </div>
-        </div>
-        <ScorePill score={company.score_overall} />
+    <div>
+      {/* Page header bar */}
+      <div className="bg-white border-b border-[#e6e9ef] px-6 py-3 sticky top-14 z-10 flex items-center gap-3">
+        <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-[#676879] hover:text-[#323338] transition-colors">
+          <ArrowLeft size={14} /> Hot Sheet
+        </Link>
+        <span className="text-[#c3c6d4]">/</span>
+        <span className="text-sm font-semibold text-[#323338] truncate">{company.name}</span>
       </div>
+
+      <div className="max-w-5xl mx-auto px-6 py-6">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <h1 className="text-2xl font-bold text-[#323338]">{company.name}</h1>
+              {company.asx_code && (
+                <span className="text-xs font-mono text-[#676879] bg-[#f6f7fb] border border-[#e6e9ef] px-2 py-0.5 rounded">{company.asx_code}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge label={gb.label} className={gb.className} size="md" />
+              <Badge label={rb.label} className={rb.className} size="md" />
+              {company.sector && <span className="text-sm text-[#676879]">{company.sector}</span>}
+              {company.mandatory_from && (
+                <span className="text-xs text-[#676879] bg-[#f6f7fb] px-2 py-0.5 rounded border border-[#e6e9ef]">Mandatory from {company.mandatory_from}</span>
+              )}
+            </div>
+          </div>
+          <ScorePill score={company.score_overall} />
+        </div>
 
       <div className="grid grid-cols-3 gap-5">
         {/* LEFT col: Score breakdown + Signals */}
         <div className="col-span-2 space-y-5">
 
           {/* Score breakdown */}
-          <div className="bg-white border border-slate-200 rounded-lg p-5">
+          <div className="bg-white border border-[#e6e9ef] rounded-lg p-5">
             <h2 className="text-sm font-semibold text-slate-700 mb-3">Score Breakdown</h2>
             <div className="space-y-2">
               {SCORE_LABELS.map((label, i) => {
@@ -114,7 +119,7 @@ export default function CompanyProfileClient({ company: initial, signals }: Prop
           </div>
 
           {/* Company data */}
-          <div className="bg-white border border-slate-200 rounded-lg p-5">
+          <div className="bg-white border border-[#e6e9ef] rounded-lg p-5">
             <h2 className="text-sm font-semibold text-slate-700 mb-3">Company Data</h2>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
               {[
@@ -140,7 +145,7 @@ export default function CompanyProfileClient({ company: initial, signals }: Prop
           </div>
 
           {/* Signal timeline */}
-          <div className="bg-white border border-slate-200 rounded-lg p-5">
+          <div className="bg-white border border-[#e6e9ef] rounded-lg p-5">
             <h2 className="text-sm font-semibold text-slate-700 mb-3">Signal Timeline</h2>
             {signals.length === 0 ? (
               <p className="text-sm text-slate-400">No signals recorded yet.</p>
@@ -174,7 +179,7 @@ export default function CompanyProfileClient({ company: initial, signals }: Prop
         {/* RIGHT col: Relationship + Pipeline */}
         <div className="space-y-5">
           {/* Relationship */}
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <div className="bg-white border border-[#e6e9ef] rounded-lg overflow-hidden">
             <button
               onClick={() => setRelExpanded(v => !v)}
               className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors"
@@ -199,7 +204,7 @@ export default function CompanyProfileClient({ company: initial, signals }: Prop
                     <select
                       value={relDraft.relationship_status}
                       onChange={e => setRelDraft(p => ({ ...p, relationship_status: e.target.value as Company['relationship_status'] }))}
-                      className="w-full text-sm border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00579B]"
+                      className="w-full text-sm border border-[#e6e9ef] rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#0073ea]"
                     >
                       <option value="none">Cold</option>
                       <option value="warm_contact">Warm contact</option>
@@ -208,23 +213,23 @@ export default function CompanyProfileClient({ company: initial, signals }: Prop
                     </select>
                     <input placeholder="Pollination lead" value={relDraft.relationship_lead}
                       onChange={e => setRelDraft(p => ({ ...p, relationship_lead: e.target.value }))}
-                      className="w-full text-sm border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00579B]" />
+                      className="w-full text-sm border border-[#e6e9ef] rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#0073ea]" />
                     <input placeholder="Contact names/titles" value={relDraft.relationship_contacts}
                       onChange={e => setRelDraft(p => ({ ...p, relationship_contacts: e.target.value }))}
-                      className="w-full text-sm border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00579B]" />
+                      className="w-full text-sm border border-[#e6e9ef] rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#0073ea]" />
                     <input type="date" value={relDraft.last_interaction_date}
                       onChange={e => setRelDraft(p => ({ ...p, last_interaction_date: e.target.value }))}
-                      className="w-full text-sm border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00579B]" />
+                      className="w-full text-sm border border-[#e6e9ef] rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#0073ea]" />
                     <textarea placeholder="Relationship notes" value={relDraft.relationship_notes} rows={3}
                       onChange={e => setRelDraft(p => ({ ...p, relationship_notes: e.target.value }))}
-                      className="w-full text-sm border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00579B] resize-none" />
+                      className="w-full text-sm border border-[#e6e9ef] rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#0073ea] resize-none" />
                     <div className="flex gap-2">
                       <button onClick={saveRelationship} disabled={saving}
-                        className="flex-1 text-xs bg-[#00579B] text-white rounded py-1.5 hover:bg-[#004a85] disabled:opacity-50">
+                        className="flex-1 text-xs bg-[#0073ea] text-white rounded py-1.5 hover:bg-[#0060c0] disabled:opacity-50">
                         {saving ? 'Saving…' : 'Save'}
                       </button>
                       <button onClick={() => setEditingRel(false)}
-                        className="flex-1 text-xs border border-slate-200 rounded py-1.5 hover:bg-slate-50">
+                        className="flex-1 text-xs border border-[#e6e9ef] rounded py-1.5 hover:bg-slate-50">
                         Cancel
                       </button>
                     </div>
@@ -253,12 +258,12 @@ export default function CompanyProfileClient({ company: initial, signals }: Prop
           </div>
 
           {/* Pipeline */}
-          <div className="bg-white border border-slate-200 rounded-lg p-4">
+          <div className="bg-white border border-[#e6e9ef] rounded-lg p-4">
             <h2 className="text-sm font-semibold text-slate-700 mb-3">Pipeline Stage</h2>
             <select
               value={pipelineStage}
               onChange={e => setPipelineStage(e.target.value)}
-              className="w-full text-sm border border-slate-200 rounded px-2 py-1.5 mb-2 focus:outline-none focus:ring-1 focus:ring-[#00579B]"
+              className="w-full text-sm border border-[#e6e9ef] rounded px-2 py-1.5 mb-2 focus:outline-none focus:ring-1 focus:ring-[#0073ea]"
             >
               <option value="">— Not in pipeline —</option>
               {Object.entries(PIPELINE_STAGE_LABELS).map(([k, v]) => (
@@ -270,17 +275,18 @@ export default function CompanyProfileClient({ company: initial, signals }: Prop
               value={pipelineNotes}
               rows={4}
               onChange={e => setPipelineNotes(e.target.value)}
-              className="w-full text-sm border border-slate-200 rounded px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-[#00579B]"
+              className="w-full text-sm border border-[#e6e9ef] rounded px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-[#0073ea]"
             />
             <button
               onClick={savePipeline}
               disabled={saving}
-              className="mt-2 w-full text-xs bg-[#00579B] text-white rounded py-1.5 hover:bg-[#004a85] disabled:opacity-50"
+              className="mt-2 w-full text-xs bg-[#0073ea] text-white rounded py-1.5 hover:bg-[#0060c0] disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

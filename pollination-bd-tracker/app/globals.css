@@ -1,18 +1,27 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&display=swap');
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --navy: #00579B;
-  --teal: #10545D;
+  /* Monday.com design tokens */
+  --monday-blue: #0073ea;
+  --monday-blue-hover: #0060c0;
+  --monday-blue-light: #cce5ff;
+  --monday-green: #00c875;
+  --monday-orange: #fdab3d;
+  --monday-red: #e2445c;
+  --monday-purple: #a25ddc;
+  --monday-dark: #1c1f3b;
+
   --surface: #FFFFFF;
   --border: oklch(0.922 0 0);
-  --text-primary: #0F172A;
-  --text-secondary: #64748B;
-  --text-muted: #94A3B8;
-  --background: oklch(1 0 0);
+  --text-primary: #323338;
+  --text-secondary: #676879;
+  --text-muted: #c3c6d4;
+  --background: #f6f7fb;
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -47,34 +56,23 @@
 
 body {
   color: var(--text-primary);
+  font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--background);
 }
 
-/* Score badge colours */
-.score-5 { background: #FEE2E2; color: #B91C1C; }
-.score-4 { background: #FFEDD5; color: #C2410C; }
-.score-3 { background: #FEF3C7; color: #B45309; }
-.score-2 { background: #ECFCCB; color: #4D7C0F; }
-.score-1 { background: #DCFCE7; color: #15803D; }
+/* Score badge colours — Monday palette */
+.score-5 { background: #ffd3d9; color: #c0253d; }
+.score-4 { background: #ffe5b4; color: #c47c00; }
+.score-3 { background: #fff3cd; color: #8a6300; }
+.score-2 { background: #d4f4e2; color: #007038; }
+.score-1 { background: #e8f5e9; color: #2e7d32; }
 
-/* Left edge score bar on rows */
-.row-score-5 { border-left: 3px solid #EF4444; }
-.row-score-4 { border-left: 3px solid #F97316; }
-.row-score-3 { border-left: 3px solid #F59E0B; }
-.row-score-2 { border-left: 3px solid #84CC16; }
-.row-score-1 { border-left: 3px solid #22C55E; }
-
-/* Group header */
-.group-header {
-  background: #F1F5F9;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-
-/* Sidebar nav active */
-.nav-active {
-  background: rgba(255,255,255,0.15);
-  border-radius: 6px;
-}
+/* Left edge score bar — Monday group color style */
+.row-score-5 { border-left: 3px solid #e2445c; }
+.row-score-4 { border-left: 3px solid #fdab3d; }
+.row-score-3 { border-left: 3px solid #ffcb00; }
+.row-score-2 { border-left: 3px solid #00c875; }
+.row-score-1 { border-left: 3px solid #9adc7c; }
 
 @theme inline {
   --font-heading: var(--font-sans);

@@ -14,39 +14,30 @@ export default function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-[#00579B] flex flex-col h-full">
-      {/* Logo / wordmark */}
-      <div className="px-5 pt-6 pb-4 border-b border-white/10">
-        <p className="text-white/60 text-[10px] uppercase tracking-widest font-semibold">Pollination</p>
-        <h1 className="text-white font-bold text-base leading-tight mt-0.5">BD Tracker</h1>
-      </div>
+    <header className="h-14 bg-white border-b border-slate-200 flex items-center px-6 gap-8 sticky top-0 z-20 w-full">
+      {/* Wordmark */}
+      <span className="font-bold text-slate-900 text-sm tracking-tight shrink-0">BD Tracker</span>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
+      <nav className="flex items-center gap-1">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/' && pathname.startsWith(href))
           return (
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors ${
                 active
-                  ? 'bg-white/15 text-white font-semibold'
-                  : 'text-white/70 hover:text-white hover:bg-white/10'
+                  ? 'bg-[#0073ea]/10 text-[#0073ea] font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
             >
-              <Icon size={16} />
+              <Icon size={15} />
               {label}
             </Link>
           )
         })}
       </nav>
-
-      {/* Footer */}
-      <div className="px-5 py-4 border-t border-white/10">
-        <p className="text-white/40 text-[10px]">ASRS BD Intelligence</p>
-        <p className="text-white/25 text-[10px]">June 2026</p>
-      </div>
-    </aside>
+    </header>
   )
 }
