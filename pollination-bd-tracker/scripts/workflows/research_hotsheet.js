@@ -55,62 +55,17 @@ const RESEARCH_SCHEMA = {
   required: ['company_name', 'notable_signals', 'confidence'],
 }
 
-// ── Phase 1: Load top companies from Supabase ─────────────────────────────────
+// ── Phase 1: Load companies from args (pre-loaded by run_research.py) ─────────
 phase('Load')
 
-const DB_RESULT = await agent(
-  `Query Supabase to get the top 25 hot sheet companies.
-
-  URL: https://ahoyjvqvgbmcoydjgzpb.supabase.co/rest/v1/companies
-  Method: GET
-  Headers:
-    apikey: sb_publishable_y8P5je4IqUJm2PCS_itZjQ_zLx0zZ9r
-    Authorization: Bearer sb_publishable_y8P5je4IqUJm2PCS_itZjQ_zLx0zZ9r
-
-  Query params:
-    select=id,name,asx_code,sector,asrs_group,score_overall,target_classification,sbti_status,sbti_date_updated
-    relationship_status=neq.current_client
-    sbti_status=neq.Targets set
-    asrs_group=neq.Unclassified
-    score_overall=gt.0
-    order=score_overall.desc
-    limit=25
-
-  Return the list of companies as JSON. Each company needs: id, name, asx_code, sector, score_overall.`,
-  {
-    label: 'Load top 25 companies',
-    schema: {
-      type: 'object',
-      properties: {
-        companies: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              name: { type: 'string' },
-              asx_code: { type: 'string' },
-              sector: { type: 'string' },
-              score_overall: { type: 'number' },
-              asrs_group: { type: 'string' },
-              target_classification: { type: 'string' },
-              sbti_status: { type: 'string' },
-            },
-            required: ['id', 'name'],
-          },
-        },
-      },
-      required: ['companies'],
-    },
-  }
-)
-
-const companies = (DB_RESULT && DB_RESULT.companies) ? DB_RESULT.companies : []
+// args is passed in from run_research.py via _research_args.json
+// Run: py scripts/run_research.py first, then this workflow
+const companies = (args && args.companies) ? args.companies : []
 log('Companies to research: ' + companies.length)
 
 if (companies.length === 0) {
-  log('No companies returned — check Supabase connection')
-  return { error: 'No companies loaded', results: [] }
+  log('No companies in args — run: py scripts/run_research.py first')
+  return { error: 'No companies loaded — run py scripts/run_research.py first', results: [] }
 }
 
 // ── Phase 2: Research each company in parallel ────────────────────────────────

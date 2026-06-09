@@ -94,8 +94,8 @@ export default function CompaniesClient({ companies }: Props) {
       </div>
 
       {/* Column headers */}
-      <div className="sticky top-[105px] z-10 bg-[#f6f7fb] border-b border-[#e6e9ef] grid grid-cols-[2fr_80px_110px_100px_130px] px-6 py-2 gap-4">
-        {['Company + Climate Target', 'Score', 'ASRS Group', 'SBTi', 'Relationship'].map(h => (
+      <div className="sticky top-[105px] z-10 bg-[#f6f7fb] border-b border-[#e6e9ef] grid grid-cols-[2fr_70px_100px_80px_2.5fr_120px] px-6 py-2 gap-3">
+        {['Company', 'Score', 'ASRS Group', 'SBTi', 'Climate Target', 'Relationship'].map(h => (
           <span key={h} className="text-[11px] font-semibold text-[#676879] uppercase tracking-wide">{h}</span>
         ))}
       </div>
@@ -105,65 +105,67 @@ export default function CompaniesClient({ companies }: Props) {
         const rb = relationshipBadge(company.relationship_status)
         const gb = asrsGroupBadge(company.asrs_group)
         const target = (company as any).target_description as string | null
-        const scope = (company as any).target_scope as string | null
+        const tc = company.target_classification
         const targetYear = (company as any).target_year as number | null
-        const netZeroYear = (company as any).nzt_end_year as number | null
+        const nztYear = (company as any).nzt_end_year as number | null
+        const scope = (company as any).target_scope as string | null
+
+        // Full target tooltip string
+        const fullTarget = [target, scope ? `(${scope})` : null, targetYear ? `by ${targetYear}` : null]
+          .filter(Boolean).join(' ')
 
         return (
           <Link
             key={company.id}
             href={`/companies/${company.id}`}
-            className={`grid grid-cols-[2fr_80px_110px_100px_130px] px-6 py-3 gap-4 border-b border-[#e6e9ef] hover:bg-[#e8f0fd]/30 transition-colors items-start ${i % 2 === 0 ? 'bg-white' : 'bg-[#fafbff]'}`}
+            className={`grid grid-cols-[2fr_70px_100px_80px_2.5fr_120px] px-6 py-3 gap-3 border-b border-[#e6e9ef] hover:bg-[#e8f0fd]/30 transition-colors items-center ${i % 2 === 0 ? 'bg-white' : 'bg-[#fafbff]'}`}
           >
-            {/* Company + full target */}
+            {/* Company */}
             <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="text-sm font-semibold text-[#323338] leading-tight">{company.name}</p>
+              <p className="text-sm font-semibold text-[#323338] truncate">{company.name}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
                 {company.asx_code && (
-                  <span className="text-[11px] font-mono text-[#676879] bg-[#f6f7fb] px-1.5 py-0.5 rounded shrink-0">{company.asx_code}</span>
+                  <span className="text-[10px] font-mono text-[#676879] bg-[#f6f7fb] px-1.5 py-0.5 rounded">{company.asx_code}</span>
                 )}
-              </div>
-
-              {/* Full climate target — the main addition */}
-              {target ? (
-                <p className="text-xs text-[#323338] leading-relaxed mt-0.5">{target}</p>
-              ) : (
-                <p className="text-xs text-[#c3c6d4] italic">No public climate target</p>
-              )}
-
-              {/* Target metadata row */}
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                {company.target_classification && (
-                  <span className="text-[10px] text-[#676879] bg-[#f6f7fb] border border-[#e6e9ef] px-1.5 py-0.5 rounded">
-                    {company.target_classification}
-                  </span>
-                )}
-                {scope && (
-                  <span className="text-[10px] text-[#676879]">{scope}</span>
-                )}
-                {targetYear && (
-                  <span className="text-[10px] text-[#676879]">Target: {targetYear}</span>
-                )}
-                {netZeroYear && (
-                  <span className="text-[10px] text-[#676879]">Net zero: {netZeroYear}</span>
+                {company.sector && (
+                  <span className="text-[10px] text-[#676879] truncate">{company.sector}</span>
                 )}
               </div>
             </div>
 
             {/* Score */}
-            <div className="pt-0.5"><ScorePill score={company.score_overall} /></div>
+            <div><ScorePill score={company.score_overall} /></div>
 
             {/* ASRS Group */}
-            <div className="pt-0.5"><Badge label={gb.label} className={gb.className} /></div>
+            <div><Badge label={gb.label} className={gb.className} /></div>
 
             {/* SBTi */}
-            <div className="pt-0.5"><SbtiPill status={company.sbti_status} /></div>
+            <div><SbtiPill status={company.sbti_status} /></div>
+
+            {/* Climate Target — back in column, truncated with tooltip */}
+            <div className="min-w-0" title={fullTarget || tc || 'No public target'}>
+              {target ? (
+                <>
+                  <p className="text-xs text-[#323338] truncate">{target}</p>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    {tc && <span className="text-[10px] text-[#676879] bg-[#f6f7fb] border border-[#e6e9ef] px-1.5 py-0.5 rounded">{tc}</span>}
+                    {scope && <span className="text-[10px] text-[#676879]">{scope}</span>}
+                    {targetYear && <span className="text-[10px] text-[#676879]">by {targetYear}</span>}
+                    {nztYear && <span className="text-[10px] text-[#676879]">net zero {nztYear}</span>}
+                  </div>
+                </>
+              ) : tc ? (
+                <span className="text-xs text-[#676879] italic">{tc}</span>
+              ) : (
+                <span className="text-xs text-[#c3c6d4] italic">No public target</span>
+              )}
+            </div>
 
             {/* Relationship */}
-            <div className="flex flex-col gap-1 pt-0.5">
+            <div className="flex flex-col gap-0.5">
               <Badge label={rb.label} className={rb.className} />
               {company.relationship_lead && (
-                <p className="text-[10px] text-[#676879]">{company.relationship_lead}</p>
+                <p className="text-[10px] text-[#676879] truncate">{company.relationship_lead}</p>
               )}
             </div>
           </Link>
