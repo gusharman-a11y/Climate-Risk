@@ -9,13 +9,13 @@ _Last updated: June 2026_
 Next.js 16 app at `C:\Users\angus.harman\Climate-Risk\pollination-bd-tracker\`
 GitHub branch: `feature/bd-tracker` on `gusharman-a11y/Climate-Risk`
 
-**3 pages working:**
+**4 pages working:**
 - `/` — Hot sheet: companies ranked by BD score, grouped by ASRS Group, Monday.com style
 - `/companies` — Full searchable/filterable universe of 2073 companies
 - `/companies/[id]` — Company profile: score breakdown, signal timeline, relationship panel, pipeline stage editor
 - `/pipeline` — Kanban board across 7 stages
 
-**Stack:** Next.js 16, Supabase (Postgres), Tailwind 4, shadcn/ui, Figtree font
+**Stack:** Next.js 16, Supabase (Postgres), Tailwind 4, Figtree font
 **Design:** Monday.com — white top nav, light grey background #f6f7fb, Monday blue #0073ea
 
 ---
@@ -25,21 +25,27 @@ GitHub branch: `feature/bd-tracker` on `gusharman-a11y/Climate-Risk`
 **Tables:** `companies` (2073 rows), `signals` (empty — manual entry only so far)
 **Keys:** in `.env.local` (not committed to git)
 
+**Schema additions needed (run in Supabase SQL editor if not done):**
+```sql
+alter table companies add column if not exists target_description text;
+alter table companies add column if not exists target_scope text;
+```
+
 ---
 
 ## Scoring system
-5 categories, each 1–5, overall = average → displayed as X/5
+Weighted average: ASRS×0.25 + TargetGap×0.30 + Risk×0.25 + Intent×0.10 + Rel×0.10
 
 | Category | What drives it |
 |----------|---------------|
-| ASRS urgency | Group 1=5, Group 2=4, Group 3=2, Unclassified=1 |
-| Target gap | No target=5, Aspirational/Old SBTi=4, Net-zero only=4, Quantitative non-validated=2, Committed=3, Validated=1 |
-| Risk signals | SBTi removed=5, Greenwashing=5, Safeguard covered=4, Target imminent=3 |
-| Intent signals | Race to Zero=3, NZT published plan=2 |
-| Relationship | Past client=4, Warm contact=3, Cold=1, Current client=0 (excluded from hot sheet) |
+| ASRS urgency | Group 1=5, Group 2=3, Group 3=2, Unclassified=1 |
+| Target gap | No target/SBTi removed=5, Aspirational/Old SBTi pre-2023=4, Net-zero only=4, Committed=3, 2023-24 validated=3, Quantitative non-validated=2, Targets set=1 |
+| Risk signals | SBTi removed/greenwashing=5, Safeguard=4, target imminent=3, delivery behind=3 |
+| Intent signals | ASRS in report=5, AGM climate item=4, Race to Zero=3, NZT plan=2 |
+| Relationship | Past client=5, Warm contact=3, Cold=1, Current client=0 (excluded) |
 
-**To change weights:** edit `scoring.config.json` then run `py scripts/rescore.py`
-**Rescore takes ~3 minutes** (2073 companies, one update per row via Supabase REST)
+**To change weights:** edit `scoring.config.json` → run `py scripts/enrich_database.py`
+**Current top scores:** Stockland 4.4, Fortescue 4.3, ASX/Downer/Inghams 4.2, Cleanaway 4.0
 
 ---
 
@@ -49,71 +55,62 @@ GitHub branch: `feature/bd-tracker` on `gusharman-a11y/Climate-Risk`
 |--------|------|-----------|--------|
 | ASX full listing | `data/ASXListedCompanies.csv` | 1976 | ✅ Loaded |
 | ASX200 target research | `data/asx200_non_sbti.csv` | 74 | ✅ Loaded |
-| NGER large emitters | `data/nger_targets.csv` | 57 | ✅ Loaded |
-| SBTi global database | `data/sbti_companies.xlsx` | 157 AU | ✅ Loaded |
+| NGER 2024-25 emissions | `data/nger_2024_25.xlsx.xlsx` | 199 matched | ✅ Loaded |
+| Safeguard baselines | `data/cer/baselines-and-emissions.csv` | 78 facilities | ✅ Loaded |
+| SBTi global database | `data/sbti_companies.xlsx` | 157 AU total, 14 matched | ⚠️ Matching issue |
 | Net Zero Tracker | `data/nzt_snapshot.xlsx` | 32 AU | ✅ Loaded |
 | Company financials | `data/company_size.csv` | 134 | ✅ Used for ASRS classification |
 | BD Tracker Excel | `Downloads/Pollination_BD_Tracker_June2026.xlsx` | — | ✅ Relationships + pipeline seeded |
-
-**Relationship data seeded:**
-- 36 current engagements (excluded from hot sheet)
-- 18 pipeline entries (in kanban)
-- 23 strategic accounts with Pollination lead names
+| Target descriptions | `asx200_non_sbti.csv` + `nger_targets.csv` | ~74 | ⚠️ Needs backfill script run |
 
 ---
 
-## Current hot sheet top 10 (June 2026)
-Stockland 4.4, Fortescue 4.3, ASX/Downer/Inghams/Vicinity/Flight Centre 4.2, Cleanaway 4.0
-Scores now range 1.0–4.4 with meaningful differentiation.
+## Known issues — PRIORITY ORDER
 
-## Known issues / next steps
+### 1. SBTi validated companies not on hot sheet ← NEXT TO FIX
+**Root cause:** 143 of 157 AU SBTi companies unmatched (mostly private — not in ASX universe).
+Only 50 DB companies have `sbti_status = 'Targets set'`, scoring ~3.2 — buried below 4.2+ no-target companies.
 
-### 1. Progress to target — PARTIALLY BUILT
-The delivery gap signal (are they on track for their SBTi?) is the most valuable signal.
-Needs:
-- NGER Scope 1 emissions matched to company targets
-- Linear path calculation: `expected_reduction = (years_elapsed / total_years) × target_pct`
-- Compare actual (NGER) vs expected → delivery gap score
-- The Python logic already exists in `../modules/bd_insights.py` (`behind_on_delivery`)
-- Needs to be ported into `scripts/rescore.py`
+**Fix needed:**
+- Insert unmatched SBTi companies as new DB records (they're private companies like Allens, Brambles, Ausgrid)
+- Add a dedicated **"SBTi Validated — V2 Refresh Needed"** section on the hot sheet for pre-2023 validated companies, sorted by validation date (oldest first). These are a different BD conversation, shouldn't compete on score.
 
-### 2. Scores still low (max ~3.8)
-- Intent and risk signals are weak — most companies score 1 on both
-- To push companies to 4-5 need manual signals: greenwashing cases, ASRS mentioned in report
-- Signal entry UI exists on company profile but signals table is empty
-- Phase 2: ASX announcement scraper to auto-populate signals
+**Script to write:** `scripts/add_sbti_private_companies.py` — inserts unmatched AU SBTi companies
 
-### 3. ASRS group classification
-- Fixed: ASX200 + NGER + company_size.csv used as proxies
-- Still ~600 companies "Unclassified" — small ASX companies without financial data
-- These are genuinely uncertain — may not meet ASRS thresholds
+### 2. Target descriptions not yet backfilled
+Run: `py scripts/backfill_targets.py` (after adding DB columns above)
+Also need scope inference fix — Fortescue shows 2030 net zero (that's S1+S2 only; NZT shows 2040)
 
-### 4. SBTi vintage signal
-- `sbti_date_updated` loaded for 157 AU companies
-- Pre-2023 validated targets flagged as score 4 (V2 refresh needed)
-- Working correctly
+### 3. Delivery progress to target — not calculated
+Linear path calc exists in `../modules/bd_insights.py`. Needs base year emissions from company research.
 
-### 5. Supabase cold start (~2s first load)
-- Free tier pauses after inactivity
-- Next.js cache added (2min for hot sheet, 5min for companies list)
-- First load after inactivity will be slow — subsequent loads instant
+### 4. Signals table empty
+Manual signal entry UI built but no data. Need to add 10-15 signals for top prospects:
+- Greenwashing cases (ACCC enforcement)
+- ASRS mentioned in sustainability reports
+- Shareholder resolutions
+
+### 5. App startup slow
+Dev server takes 20-30s first compile. Normal for Turbopack cold start.
+`@import "shadcn/tailwind.css"` removed — was causing 10min hang. Now compiles fast.
+
+### 6. Deploy to Vercel — not done yet
+Needed for team sharing. Steps: connect repo → add env vars → deploy.
 
 ---
-
-## Scoring formula (updated)
-Weighted average (not flat): ASRS×0.25 + TargetGap×0.30 + Risk×0.25 + Intent×0.10 + Relationship×0.10
-Edit `scoring.config.json` then run `py scripts/enrich_database.py` to update.
 
 ## Scripts
 
-| Script | What it does |
-|--------|-------------|
-| `scripts/seed_database.py` | Full re-seed from CSVs. Wipes and re-inserts all 2073 companies. Run once on first setup. |
-| `scripts/enrich_database.py` | **Main script.** Loads NGER emissions, Safeguard, SBTi, rescores everything. Run this to refresh. ~5 min. |
-| `scripts/rescore.py` | Rescore only (no data enrichment). Faster if you just changed scoring weights. ~3 min. |
-| `scripts/check_hotsheet.py` | Prints top 20 companies to terminal for sanity checking. |
-| `scripts/diagnose.py` | Shows SBTi distribution, NGER coverage, score distribution. |
-| `supabase/schema.sql` | Database schema — run in Supabase SQL editor to recreate tables. |
+| Script | What it does | When to run |
+|--------|-------------|-------------|
+| `scripts/seed_database.py` | Full re-seed from all CSVs. Wipes and re-inserts 2073 companies. | First setup only |
+| `scripts/enrich_database.py` | **Main script.** NGER + Safeguard + SBTi + rescore. | After data refresh |
+| `scripts/backfill_targets.py` | Adds target_description + target_scope from research CSVs | After adding DB columns |
+| `scripts/rescore.py` | Rescore only (no data enrichment). | After changing scoring.config.json |
+| `scripts/diagnose.py` | Shows data coverage stats. | Debugging |
+| `scripts/diagnose_sbti.py` | Shows SBTi matching + scoring analysis. | Debugging |
+| `scripts/check_hotsheet.py` | Prints top 20 companies to terminal. | Sanity check |
+| `supabase/schema.sql` | DB schema. | First setup only |
 
 ---
 
@@ -121,46 +118,36 @@ Edit `scoring.config.json` then run `py scripts/enrich_database.py` to update.
 
 ```bash
 cd C:\Users\angus.harman\Climate-Risk\pollination-bd-tracker
-npm run dev
+npx next dev
 # Open http://localhost:3000
 ```
 
-Requires `.env.local` with Supabase URL, anon key and secret key.
-See `.env.local.example` for the format. Keys are in your local `.env.local` (not committed).
+`.env.local` has Supabase URL, anon key and secret key (not committed to git).
 
 ---
 
-## Decisions made (for context in next chat)
+## Architecture decisions
 
-- **No Pollination branding** — Monday.com design language throughout
-- **Supabase not Vercel Postgres** — consistent with ASRS gap tool, has table editor UI
-- **Scoring is static** (calculated at seed/rescore time, stored in DB) — not dynamic per request
-- **Relationship status:** current_client / past_client / warm_contact / none
-  - Current clients excluded from hot sheet entirely
-  - Relationship is a score multiplier, not a separate filter
-- **Pipeline stages:** watch / prospect / qualified / proposal / negotiation / mandated / missed
-  - Matches Pollination BD Excel stages
-- **NZT snapshot** saved at `data/nzt_snapshot.xlsx` (downloaded June 7 2026)
-  - Re-download from zerotracker.net when stale, replace file, re-run seed
-- **SBTi vintage scoring:** pre-2023 validated = score 4 (V2 refresh signal)
-- **ASRS group classification hierarchy:** actual financials → ASX200 proxy → NGER proxy → market cap tier → Unclassified
+- **No Pollination branding** — Monday.com design throughout
+- **Supabase** — consistent with ASRS gap tool, has table editor UI
+- **Scoring is static** — calculated at enrichment time, stored in DB
+- **Weighted formula** (not flat average): ASRS×0.25, TargetGap×0.30, Risk×0.25, Intent×0.10, Rel×0.10
+- **Relationship:** current_client excluded from hot sheet; past_client=5, warm=3, cold=1
+- **SBTi vintage:** pre-2023 validated = score 4 (V2 refresh signal)
+- **ASRS group hierarchy:** actual financials → ASX200 proxy → NGER proxy → market cap tier → Unclassified
+- **Pipeline stages:** watch/prospect/qualified/proposal/negotiation/mandated/missed
+
+## Hot sheet groups (current + planned)
+1. Group 1 — Mandatory NOW
+2. Group 2 — Mandatory FY2026/27
+3. Group 3 — Mandatory FY2027/28
+4. **SBTi Validated — V2 Refresh** ← TO BUILD (pre-2023 validated, sorted oldest first)
+5. Unclassified
 
 ---
 
-## Conversation context (what was discussed)
-
-This was built across one long conversation. Key design decisions:
-1. Started as discussion of data sources and architecture — user (Gus) wanted to plan before building
-2. Monday.com as explicit design reference — confirmed twice
-3. No Pollination branding — user preference
-4. Supabase chosen over Vercel Postgres for table editor + consistency
-5. Scoring: 1-5 per category, average overall (not weighted sum)
-6. SBTi vintage added as signal after research into how TPI/CA100+ assess companies
-7. NZT data integrated — 32 AU companies with intent/plan signals
-8. BD Excel (June 2026) seeded for existing relationships and pipeline
-
-**Next priorities (in order):**
-1. Delivery progress to target calculation (port from Python bd_insights.py)
-2. Manual signal entry — add greenwashing cases, ASRS mentions for top prospects
-3. Deploy to Vercel for team sharing
-4. ASX announcement scraper for auto-signals (Phase 2)
+## Immediate next session tasks
+1. `scripts/add_sbti_private_companies.py` — insert 143 unmatched AU SBTi companies
+2. Add "SBTi V2 Refresh" group to hot sheet UI (HotSheetClient.tsx)
+3. Run `py scripts/backfill_targets.py` (after adding DB columns in Supabase)
+4. Deploy to Vercel
