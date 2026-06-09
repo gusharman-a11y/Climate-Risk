@@ -62,9 +62,13 @@ GitHub branch: `feature/bd-tracker` on `gusharman-a11y/Climate-Risk`
 
 ---
 
+## Current hot sheet top 10 (June 2026)
+Stockland 4.4, Fortescue 4.3, ASX/Downer/Inghams/Vicinity/Flight Centre 4.2, Cleanaway 4.0
+Scores now range 1.0–4.4 with meaningful differentiation.
+
 ## Known issues / next steps
 
-### 1. Progress to target — NOT BUILT YET
+### 1. Progress to target — PARTIALLY BUILT
 The delivery gap signal (are they on track for their SBTi?) is the most valuable signal.
 Needs:
 - NGER Scope 1 emissions matched to company targets
@@ -96,13 +100,19 @@ Needs:
 
 ---
 
+## Scoring formula (updated)
+Weighted average (not flat): ASRS×0.25 + TargetGap×0.30 + Risk×0.25 + Intent×0.10 + Relationship×0.10
+Edit `scoring.config.json` then run `py scripts/enrich_database.py` to update.
+
 ## Scripts
 
 | Script | What it does |
 |--------|-------------|
-| `scripts/seed_database.py` | Full re-seed from CSVs. Wipes and re-inserts all 2073 companies. |
-| `scripts/rescore.py` | Re-scores all companies using `scoring.config.json`. Run after editing weights. ~3 min. |
+| `scripts/seed_database.py` | Full re-seed from CSVs. Wipes and re-inserts all 2073 companies. Run once on first setup. |
+| `scripts/enrich_database.py` | **Main script.** Loads NGER emissions, Safeguard, SBTi, rescores everything. Run this to refresh. ~5 min. |
+| `scripts/rescore.py` | Rescore only (no data enrichment). Faster if you just changed scoring weights. ~3 min. |
 | `scripts/check_hotsheet.py` | Prints top 20 companies to terminal for sanity checking. |
+| `scripts/diagnose.py` | Shows SBTi distribution, NGER coverage, score distribution. |
 | `supabase/schema.sql` | Database schema — run in Supabase SQL editor to recreate tables. |
 
 ---
