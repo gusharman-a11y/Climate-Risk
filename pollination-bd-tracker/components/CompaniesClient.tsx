@@ -14,6 +14,7 @@ export default function CompaniesClient({ companies }: Props) {
   const [sectorFilter, setSectorFilter] = useState('')
   const [groupFilter, setGroupFilter] = useState('')
   const [relFilter, setRelFilter] = useState('')
+  const [sbtiFilter, setSbtiFilter] = useState('')
 
   const sectors = useMemo(() =>
     [...new Set(companies.map(c => c.sector).filter(Boolean))].sort() as string[]
@@ -25,8 +26,15 @@ export default function CompaniesClient({ companies }: Props) {
     if (sectorFilter && c.sector !== sectorFilter) return false
     if (groupFilter && c.asrs_group !== groupFilter) return false
     if (relFilter && c.relationship_status !== relFilter) return false
+    if (sbtiFilter) {
+      const s = (c.sbti_status ?? '').toLowerCase()
+      if (sbtiFilter === 'none' && c.sbti_status) return false
+      if (sbtiFilter === 'removed' && !s.includes('removed')) return false
+      if (sbtiFilter === 'committed' && (!s.includes('committed') || s.includes('removed'))) return false
+      if (sbtiFilter === 'validated' && !s.includes('targets set')) return false
+    }
     return true
-  }), [companies, search, sectorFilter, groupFilter, relFilter])
+  }), [companies, search, sectorFilter, groupFilter, relFilter, sbtiFilter])
 
   return (
     <div>
@@ -58,6 +66,14 @@ export default function CompaniesClient({ companies }: Props) {
             <option value="Group 3">Group 3</option>
             <option value="Unclassified">Unclassified</option>
           </select>
+          <select value={sbtiFilter} onChange={e => setSbtiFilter(e.target.value)}
+            className="text-sm border border-[#e6e9ef] rounded-md py-1.5 px-2.5 bg-white text-[#323338] focus:outline-none focus:border-[#0073ea]">
+            <option value="">All SBTi</option>
+            <option value="none">No SBTi</option>
+            <option value="committed">Committed</option>
+            <option value="validated">Validated</option>
+            <option value="removed">Removed</option>
+          </select>
           <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)}
             className="text-sm border border-[#e6e9ef] rounded-md py-1.5 px-2.5 bg-white text-[#323338] focus:outline-none focus:border-[#0073ea]">
             <option value="">All sectors</option>
@@ -76,7 +92,7 @@ export default function CompaniesClient({ companies }: Props) {
 
       {/* Column headers */}
       <div className="sticky top-[105px] z-10 bg-[#f6f7fb] border-b border-[#e6e9ef] grid grid-cols-[2fr_80px_110px_0.8fr_2fr_130px] px-6 py-2 gap-2">
-        {['Company', 'Score', 'ASRS Group', 'Sector', 'Climate Target', 'Relationship'].map(h => (
+        {['Company', 'Score', 'ASRS Group', 'SBTi', 'Climate Target', 'Relationship'].map(h => (
           <span key={h} className="text-[11px] font-semibold text-[#676879] uppercase tracking-wide">{h}</span>
         ))}
       </div>
@@ -97,7 +113,16 @@ export default function CompaniesClient({ companies }: Props) {
             </div>
             <div><ScorePill score={company.score_overall} /></div>
             <div><Badge label={gb.label} className={gb.className} /></div>
-            <div><p className="text-xs text-[#676879] truncate">{company.sector ?? '—'}</p></div>
+            <div className="flex items-center min-w-0">
+              {company.sbti_status ? (
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full truncate ${
+                  company.sbti_status.toLowerCase().includes('targets set') ? 'bg-[#d4f4e2] text-[#007038]' :
+                  company.sbti_status.toLowerCase().includes('committed') ? 'bg-[#cce5ff] text-[#0060c0]' :
+                  company.sbti_status.toLowerCase().includes('removed') ? 'bg-[#ffd3d9] text-[#c0253d]' :
+                  'bg-[#f6f7fb] text-[#676879]'
+                }`}>{company.sbti_status}</span>
+              ) : <span className="text-xs text-[#c3c6d4]">—</span>}
+            </div>
             <div className="min-w-0">
               {company.target_description
                 ? <p className="text-xs text-[#323338] truncate font-medium" title={company.target_description}>{company.target_description}</p>

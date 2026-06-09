@@ -97,6 +97,8 @@ function SbtiV2Row({ company, i }: { company: Company; i: number }) {
 export default function HotSheetClient({ companies, sbtiV2Companies }: Props) {
   const [search, setSearch] = useState('')
   const [sectorFilter, setSectorFilter] = useState('')
+  const [groupFilter, setGroupFilter] = useState('')
+  const [sbtiFilter, setSbtiFilter] = useState('')
   const [minScore, setMinScore] = useState(0)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
@@ -104,18 +106,31 @@ export default function HotSheetClient({ companies, sbtiV2Companies }: Props) {
     [...new Set(companies.map(c => c.sector).filter(Boolean))].sort() as string[]
   , [companies])
 
+  const matchesSbti = (c: Company) => {
+    if (!sbtiFilter) return true
+    const s = (c.sbti_status ?? '').toLowerCase()
+    if (sbtiFilter === 'none') return !c.sbti_status || s === ''
+    if (sbtiFilter === 'removed') return s.includes('removed')
+    if (sbtiFilter === 'committed') return s.includes('committed') && !s.includes('removed')
+    if (sbtiFilter === 'validated') return s.includes('targets set')
+    return true
+  }
+
   const filtered = useMemo(() => companies.filter(c => {
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false
     if (sectorFilter && c.sector !== sectorFilter) return false
+    if (groupFilter && c.asrs_group !== groupFilter) return false
+    if (!matchesSbti(c)) return false
     if (minScore && (c.score_overall ?? 0) < minScore) return false
     return true
-  }), [companies, search, sectorFilter, minScore])
+  }), [companies, search, sectorFilter, groupFilter, sbtiFilter, minScore])
 
   const filteredV2 = useMemo(() => sbtiV2Companies.filter(c => {
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false
     if (sectorFilter && c.sector !== sectorFilter) return false
+    if (groupFilter && c.asrs_group !== groupFilter) return false
     return true
-  }), [sbtiV2Companies, search, sectorFilter])
+  }), [sbtiV2Companies, search, sectorFilter, groupFilter])
 
   const grouped = useMemo(() => ASRS_GROUPS.reduce<Record<string, Company[]>>((acc, g) => {
     acc[g] = filtered.filter(c => c.asrs_group === g)
@@ -151,6 +166,26 @@ export default function HotSheetClient({ companies, sbtiV2Companies }: Props) {
               className="pl-8 pr-3 py-1.5 text-sm border border-[#e6e9ef] rounded-md w-44 focus:outline-none focus:border-[#0073ea] focus:ring-2 focus:ring-[#0073ea]/20 bg-white text-[#323338] placeholder:text-[#c3c6d4]"
             />
           </div>
+          {/* ASRS Group filter */}
+          <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
+            className="text-sm border border-[#e6e9ef] rounded-md py-1.5 px-2.5 focus:outline-none focus:border-[#0073ea] bg-white text-[#323338]">
+            <option value="">All groups</option>
+            <option value="Group 1">Group 1</option>
+            <option value="Group 2">Group 2</option>
+            <option value="Group 3">Group 3</option>
+            <option value="Unclassified">Unclassified</option>
+          </select>
+
+          {/* SBTi filter */}
+          <select value={sbtiFilter} onChange={e => setSbtiFilter(e.target.value)}
+            className="text-sm border border-[#e6e9ef] rounded-md py-1.5 px-2.5 focus:outline-none focus:border-[#0073ea] bg-white text-[#323338]">
+            <option value="">All SBTi</option>
+            <option value="none">No SBTi</option>
+            <option value="committed">Committed</option>
+            <option value="validated">Validated</option>
+            <option value="removed">Removed</option>
+          </select>
+
           <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)}
             className="text-sm border border-[#e6e9ef] rounded-md py-1.5 px-2.5 focus:outline-none focus:border-[#0073ea] bg-white text-[#323338]">
             <option value="">All sectors</option>
