@@ -1,20 +1,40 @@
 import { supabase } from './supabase'
 import type { Company, Signal } from './types'
 
+const HOT_SHEET_COLS = 'id,name,asx_code,sector,asrs_group,score_overall,score_asrs,score_target_gap,score_risk,score_intent,score_relationship,top_signal,relationship_status,relationship_lead,pipeline_stage,mandatory_from,sbti_status,sbti_date_updated'
+
 // ── Hot Sheet ─────────────────────────────────────────────────────────────────
 
-export async function getHotSheet(): Promise<Company[]> {
-  const { data, error } = await supabase
-    .from('companies')
-    .select('id,name,asx_code,sector,asrs_group,score_overall,score_asrs,score_target_gap,score_risk,score_intent,score_relationship,top_signal,relationship_status,relationship_lead,pipeline_stage,mandatory_from')
-    .not('relationship_status', 'eq', 'current_client')
-    .not('pipeline_stage', 'in', '("mandated","negotiation","proposal")')
-    .gt('score_overall', 0)
-    .order('score_overall', { ascending: false })
-    .limit(200)
+export async function getHotSheet(): Promise<{ main: Company[]; sbtiV2: Company[] }> {
+  // Main hot sheet — exclude current clients, active pipeline, and SBTi-validated companies
+  const [mainRes, sbtiRes] = await Promise.all([
+    supabase
+      .from('companies')
+      .select(HOT_SHEET_COLS)
+      .not('relationship_status', 'eq', 'current_client')
+      .not('pipeline_stage', 'in', '("mandated","negotiation","proposal")')
+      .not('sbti_status', 'eq', 'Targets set')
+      .gt('score_overall', 0)
+      .order('score_overall', { ascending: false })
+      .limit(300),
 
-  if (error) throw error
-  return (data ?? []) as Company[]
+    // SBTi V2 refresh group — validated companies, oldest first
+    supabase
+      .from('companies')
+      .select(HOT_SHEET_COLS)
+      .eq('sbti_status', 'Targets set')
+      .not('relationship_status', 'eq', 'current_client')
+      .order('sbti_date_updated', { ascending: true })
+      .limit(100),
+  ])
+
+  if (mainRes.error) throw mainRes.error
+  if (sbtiRes.error) throw sbtiRes.error
+
+  return {
+    main: (mainRes.data ?? []) as Company[],
+    sbtiV2: (sbtiRes.data ?? []) as Company[],
+  }
 }
 
 // ── Full universe with filters ─────────────────────────────────────────────
@@ -27,7 +47,7 @@ export async function getCompanies(filters?: {
   search?: string
 }): Promise<Company[]> {
   let query = supabase.from('companies').select(
-    'id,name,asx_code,sector,asrs_group,score_overall,target_classification,target_description,target_scope,relationship_status,relationship_lead,pipeline_stage,mandatory_from'
+    'id,name,asx_code,sector,asrs_group,score_overall,target_classification,target_description,target_scope,relationship_status,relationship_lead,pipeline_stage,mandatory_from,sbti_status,sbti_date_updated'
   )
 
   if (filters?.asrs_group) query = query.eq('asrs_group', filters.asrs_group)
