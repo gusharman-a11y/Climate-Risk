@@ -100,7 +100,7 @@ export default function HotSheetClient({ companies, sbtiV2Companies }: Props) {
   const [groupFilter, setGroupFilter] = useState('')
   const [sbtiFilter, setSbtiFilter] = useState('')
   const [minScore, setMinScore] = useState(0)
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set(['sbti-v2']))
 
   const sectors = useMemo(() =>
     [...new Set(companies.map(c => c.sector).filter(Boolean))].sort() as string[]
@@ -143,6 +143,14 @@ export default function HotSheetClient({ companies, sbtiV2Companies }: Props) {
     return next
   })
 
+  // Auto-expand SBTi V2 group when validated filter applied
+  const handleSbtiFilter = (val: string) => {
+    setSbtiFilter(val)
+    if (val === 'validated') {
+      setCollapsed(prev => { const next = new Set(prev); next.delete('sbti-v2'); return next })
+    }
+  }
+
   const totalShown = filtered.length + filteredV2.length
 
   return (
@@ -177,7 +185,7 @@ export default function HotSheetClient({ companies, sbtiV2Companies }: Props) {
           </select>
 
           {/* SBTi filter */}
-          <select value={sbtiFilter} onChange={e => setSbtiFilter(e.target.value)}
+          <select value={sbtiFilter} onChange={e => handleSbtiFilter(e.target.value)}
             className="text-sm border border-[#e6e9ef] rounded-md py-1.5 px-2.5 focus:outline-none focus:border-[#0073ea] bg-white text-[#323338]">
             <option value="">All SBTi</option>
             <option value="none">No SBTi</option>
