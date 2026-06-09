@@ -60,6 +60,7 @@ export interface Company {
   // Target
   sbti_status: string | null
   sbti_date_updated: string | null
+  sbti_target_text: string | null
   target_classification: string | null
   target_description: string | null
   target_scope: string | null

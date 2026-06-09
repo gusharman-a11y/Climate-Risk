@@ -56,33 +56,47 @@ function CompanyRow({ company, i }: { company: Company; i: number }) {
   )
 }
 
-// ── SBTi V2 row — different columns ──────────────────────────────────────────
+// ── SBTi V2 row ───────────────────────────────────────────────────────────────
 function SbtiV2Row({ company, i }: { company: Company; i: number }) {
   const rb = relationshipBadge(company.relationship_status)
   const gb = asrsGroupBadge(company.asrs_group)
   const dateStr = company.sbti_date_updated ? company.sbti_date_updated.slice(0, 7) : '—'
   const yr = company.sbti_date_updated ? parseInt(company.sbti_date_updated.slice(0, 4)) : null
-  const urgency = yr && yr < 2021 ? 'bg-[#ffd3d9] text-[#c0253d]' : yr && yr < 2023 ? 'bg-[#ffe5b4] text-[#c47c00]' : 'bg-[#f6f7fb] text-[#676879]'
+  const urgency = yr && yr < 2021 ? 'bg-[#ffd3d9] text-[#c0253d]' :
+                  yr && yr < 2023 ? 'bg-[#ffe5b4] text-[#c47c00]' :
+                  'bg-[#f6f7fb] text-[#676879]'
+  const targetText = (company as any).sbti_target_text as string | null
 
   return (
     <Link
       href={`/companies/${company.id}`}
-      className={`grid grid-cols-[2.5fr_100px_110px_2fr_1fr_130px] px-6 py-0 gap-2 border-b border-[#e6e9ef] hover:bg-[#e8f0fd]/30 transition-colors items-stretch border-l-[3px] border-l-[#a25ddc] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fafbff]'}`}
+      className={`grid grid-cols-[2.5fr_90px_110px_2.5fr_90px_130px] px-6 py-0 gap-2 border-b border-[#e6e9ef] hover:bg-[#e8f0fd]/30 transition-colors items-stretch border-l-[3px] border-l-[#a25ddc] ${i % 2 === 0 ? 'bg-white' : 'bg-[#fafbff]'}`}
     >
+      {/* Company */}
       <div className="flex flex-col justify-center py-2.5 min-w-0">
         <p className="text-sm font-semibold text-[#323338] truncate leading-tight">{company.name}</p>
-        {company.asx_code && <p className="text-[11px] text-[#676879] font-mono mt-0.5">{company.asx_code}</p>}
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {company.asx_code && <p className="text-[11px] text-[#676879] font-mono">{company.asx_code}</p>}
+          {company.sector && <p className="text-[11px] text-[#676879] truncate">{company.sector}</p>}
+        </div>
       </div>
+      {/* Validation date */}
       <div className="flex items-center">
         <span className={`text-xs font-bold px-2 py-1 rounded-full ${urgency}`}>{dateStr}</span>
       </div>
+      {/* ASRS group */}
       <div className="flex items-center"><Badge label={gb.label} className={gb.className} /></div>
-      <div className="flex items-center min-w-0">
-        <p className="text-xs text-[#676879] truncate">{company.sector ?? '—'}</p>
+      {/* SBTi target text */}
+      <div className="flex items-center min-w-0" title={targetText || ''}>
+        {targetText ? (
+          <p className="text-xs text-[#323338] truncate">{targetText}</p>
+        ) : (
+          <p className="text-xs text-[#c3c6d4] italic">Target text not available</p>
+        )}
       </div>
-      <div className="flex items-center">
-        <ScorePill score={company.score_overall} />
-      </div>
+      {/* Score */}
+      <div className="flex items-center"><ScorePill score={company.score_overall} /></div>
+      {/* Relationship */}
       <div className="flex flex-col justify-center gap-0.5">
         <Badge label={rb.label} className={rb.className} />
         {company.relationship_lead && (
@@ -143,11 +157,13 @@ export default function HotSheetClient({ companies, sbtiV2Companies }: Props) {
     return next
   })
 
-  // Auto-expand SBTi V2 group when validated filter applied
+  // Auto-expand V2 group when validated or "all" selected; collapse when "off"
   const handleSbtiFilter = (val: string) => {
     setSbtiFilter(val)
-    if (val === 'validated') {
+    if (val === 'validated' || val === 'all') {
       setCollapsed(prev => { const next = new Set(prev); next.delete('sbti-v2'); return next })
+    } else if (val === 'off') {
+      setCollapsed(prev => { const next = new Set(prev); next.add('sbti-v2'); return next })
     }
   }
 
@@ -186,11 +202,13 @@ export default function HotSheetClient({ companies, sbtiV2Companies }: Props) {
           {/* SBTi filter */}
           <select value={sbtiFilter} onChange={e => handleSbtiFilter(e.target.value)}
             className="text-sm border border-[#e6e9ef] rounded-md py-1.5 px-2.5 focus:outline-none focus:border-[#0073ea] bg-white text-[#323338]">
-            <option value="">All SBTi</option>
+            <option value="">All (SBTi off)</option>
+            <option value="all">All + SBTi validated</option>
+            <option value="validated">SBTi validated only</option>
             <option value="none">No SBTi</option>
             <option value="committed">Committed</option>
-            <option value="validated">Validated</option>
             <option value="removed">Removed</option>
+            <option value="off">Hide SBTi section</option>
           </select>
 
           <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)}
@@ -271,8 +289,8 @@ export default function HotSheetClient({ companies, sbtiV2Companies }: Props) {
             {!isCollapsed && (
               <>
                 {/* V2-specific column headers */}
-                <div className="bg-[#f6f7fb] border-b border-[#e6e9ef] grid grid-cols-[2.5fr_100px_110px_2fr_1fr_130px] px-6 py-2 gap-2">
-                  {['Company', 'Validated', 'ASRS Group', 'Sector', 'Score', 'Relationship'].map(h => (
+                <div className="bg-[#f6f7fb] border-b border-[#e6e9ef] grid grid-cols-[2.5fr_90px_110px_2.5fr_90px_130px] px-6 py-2 gap-2">
+                  {['Company', 'Validated', 'ASRS Group', 'SBTi Target', 'Score', 'Relationship'].map(h => (
                     <span key={h} className="text-[11px] font-semibold text-[#676879] uppercase tracking-wide">{h}</span>
                   ))}
                 </div>

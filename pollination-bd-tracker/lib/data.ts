@@ -6,8 +6,9 @@ const HOT_SHEET_COLS = 'id,name,asx_code,sector,asrs_group,score_overall,score_a
 // ── Hot Sheet ─────────────────────────────────────────────────────────────────
 
 export async function getHotSheet(): Promise<{ main: Company[]; sbtiV2: Company[] }> {
-  // Main hot sheet — exclude current clients, active pipeline, and SBTi-validated companies
   const [mainRes, sbtiRes] = await Promise.all([
+    // Main hot sheet — all except current clients, active pipeline, Unclassified
+    // Includes SBTi-removed and no-target companies (the core BD targets)
     supabase
       .from('companies')
       .select(HOT_SHEET_COLS)
@@ -19,14 +20,14 @@ export async function getHotSheet(): Promise<{ main: Company[]; sbtiV2: Company[
       .order('score_overall', { ascending: false })
       .limit(300),
 
-    // SBTi V2 refresh group — validated companies, oldest first
+    // SBTi V2 refresh group — validated companies sorted oldest-validated first
     supabase
       .from('companies')
-      .select(HOT_SHEET_COLS)
+      .select(HOT_SHEET_COLS + ',sbti_target_text')
       .eq('sbti_status', 'Targets set')
       .not('relationship_status', 'eq', 'current_client')
       .order('sbti_date_updated', { ascending: true })
-      .limit(100),
+      .limit(150),
   ])
 
   if (mainRes.error) throw mainRes.error
