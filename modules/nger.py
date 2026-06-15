@@ -351,7 +351,29 @@ def build_nger_only_cohort(existing_cohort_names: list[str]) -> pd.DataFrame:
     out["ISIN"] = ""
     out["Country"] = "Australia"
     out["Region"] = "Oceania"
-    out["Sector"] = "NGER reporter (sector unclassified)"
+
+    # ── GICS sector from ASX listings ─────────────────────────────────────────
+    try:
+        from modules.asx_listings import load_asx_listings, _name_key as _asx_key
+        _listings = load_asx_listings()
+        if (
+            not _listings.empty
+            and "GICS Industry Group" in _listings.columns
+            and "_key" in _listings.columns
+        ):
+            _gics_lookup: dict[str, str] = (
+                _listings.dropna(subset=["GICS Industry Group"])
+                .set_index("_key")["GICS Industry Group"]
+                .to_dict()
+            )
+            out["Sector"] = out["Company Name"].apply(
+                lambda n: _gics_lookup.get(_asx_key(str(n)), "Not classified")
+            )
+        else:
+            out["Sector"] = "Not classified"
+    except Exception:
+        out["Sector"] = "Not classified"
+    # ──────────────────────────────────────────────────────────────────────────
     out["Industry"] = ""
     out["Organization Type"] = "NGER reporter"
     out["Near-term Status"] = ""
@@ -408,7 +430,7 @@ def build_nger_only_cohort(existing_cohort_names: list[str]) -> pd.DataFrame:
         out.loc[mask, "Target"] = out.loc[mask, "_target_desc"]
         out.loc[mask, "Target Classification"] = out.loc[mask, "_target_class"]
         out.loc[mask, "Target Classification (Long)"] = out.loc[mask, "_target_class"]
-        out.loc[mask, "Sector"] = "NGER reporter (target overlay applied)"
+        # Sector stays as the GICS lookup result — don't overwrite it here
         # Coerce year columns
         for src, dst in [("_target_year", "Target Year"), ("_nz_year", "Net-Zero Year")]:
             yr = pd.to_numeric(out[src], errors="coerce")

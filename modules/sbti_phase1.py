@@ -280,25 +280,50 @@ def best_target_year(row: pd.Series) -> tuple[int | None, str]:
 
 # ASX-listed Australian companies whose SBTi records carry no AU ISIN
 # (data-quality miss in the SBTi dataset). Hand-curated.
+# These all have Country = "Australia" in the SBTi register but a non-AU ISIN.
 ASX_ALLOWLIST = {
-    "Xero",                          # NZ ISIN, but ASX:XRO dual-listed
+    "Xero",                          # NZ ISIN (NZ9429063010S2), ASX:XRO dual-listed
     "MoneyMe Limited",               # ASX:MME
     "Pro-Pac Packaging Limited",     # ASX:PPG
     "Pro-Pac Packaging",
 }
 
+# Companies with active SBTi targets registered under a NON-Australian country
+# because they are incorporated outside Australia but have significant ASX
+# presence and Australian ASRS Group 1 reporting obligations.
+# Key: ISIN as it appears in the SBTi register (may not start with AU).
+ASX_ISIN_OVERRIDES: set[str] = {
+    "JE00BJ1F3079",   # Amcor plc — Country=Switzerland, ASX:AMC — Targets set
+}
+# Companies where the SBTi register has no ISIN (company-name-only match).
+ASX_COMPANY_OVERRIDES: set[str] = {
+    "News Corp",              # Country=USA (US65249B2088), ASX:NWS CDI — Targets set
+    "Atlassian Corporation",  # Country=USA, no ISIN, Nasdaq:TEAM / ASX CDI — Targets set
+}
+# ── Latent risk (no current SBTi target but would be missed if they commit) ──
+# Rio Tinto plc  — ISIN GB0007188757, Country=United Kingdom in SBTi register.
+# Rio Tinto Limited (AU000000RIO1) would be caught by the AU ISIN filter.
+# No action needed until commitment is made; documented here for awareness.
+
 
 def filter_asx(df: pd.DataFrame) -> pd.DataFrame:
-    """ASX-listed cohort: Australian SBTi entries with an AU ISIN, plus a
-    hand-curated allow-list of dual-listed/missing-ISIN ASX entities."""
+    """ASX-listed cohort: Australian SBTi entries with an AU ISIN, plus
+    hand-curated allowlists for:
+      - Australian-country entries with non-AU ISINs (ASX_ALLOWLIST)
+      - Non-Australian-country entries for companies with ASX presence and
+        Australian ASRS Group 1 obligations (ASX_ISIN_OVERRIDES /
+        ASX_COMPANY_OVERRIDES)
+    """
     if df.empty:
         return df
     country = df[CANON["country"]].astype(str).str.strip().str.lower()
     isin = df[CANON["isin"]].astype(str).str.strip().str.upper()
     company = df[CANON["company"]].astype(str).str.strip()
-    mask_isin = country.eq("australia") & isin.str.startswith("AU")
-    mask_allow = country.eq("australia") & company.isin(ASX_ALLOWLIST)
-    return df[mask_isin | mask_allow].copy()
+    mask_isin       = country.eq("australia") & isin.str.startswith("AU")
+    mask_allow      = country.eq("australia") & company.isin(ASX_ALLOWLIST)
+    mask_isin_ovr   = isin.isin(ASX_ISIN_OVERRIDES)
+    mask_comp_ovr   = company.isin(ASX_COMPANY_OVERRIDES)
+    return df[mask_isin | mask_allow | mask_isin_ovr | mask_comp_ovr].copy()
 
 
 def filter_au_private(df: pd.DataFrame) -> pd.DataFrame:
@@ -311,7 +336,12 @@ def filter_au_private(df: pd.DataFrame) -> pd.DataFrame:
     isin = df[CANON["isin"]].astype(str).str.strip().str.upper()
     company = df[CANON["company"]].astype(str).str.strip()
     org = df[CANON["org_type"]].astype(str).str.strip().str.lower()
-    in_asx = country.eq("australia") & (isin.str.startswith("AU") | company.isin(ASX_ALLOWLIST))
+    # Exclude everything already captured by filter_asx (including ISIN/company overrides)
+    in_asx = (
+        (country.eq("australia") & (isin.str.startswith("AU") | company.isin(ASX_ALLOWLIST)))
+        | isin.isin(ASX_ISIN_OVERRIDES)
+        | company.isin(ASX_COMPANY_OVERRIDES)
+    )
     is_au = country.eq("australia")
     has_org = org.isin({"corporate", "financial institution", "sme"})
     return df[is_au & ~in_asx & has_org].copy()
@@ -320,8 +350,18 @@ def filter_au_private(df: pd.DataFrame) -> pd.DataFrame:
 COHORTS = {
     "ASX listed (SBTi)": filter_asx,
     "Australian Corporate / FI (SBTi, private)": filter_au_private,
-    "ASX 200 — no SBTi target": None,  # Loaded from a separate CSV, not filtered from SBTi data
-    "NGER reporters (not in cohort)": None,  # Loaded from NGER xlsx; large-emitter universe
+    "ASX 200 — no SBTi target": None,        # from data/asx200_non_sbti.csv
+    "NGER reporters (not in cohort)": None,  # from data/nger_*.xlsx
+    "Large private (ATO)": None,             # from data/ato_transparency.xlsx
+}
+
+# Display label mapping: internal cohort key → BD-friendly "Listed" column value
+_COHORT_TO_LISTED = {
+    "ASX listed (SBTi)": "ASX Listed",
+    "Australian Corporate / FI (SBTi, private)": "Private & Unlisted",
+    "ASX 200 — no SBTi target": "ASX Listed",
+    "NGER reporters (not in cohort)": "Private & Unlisted",
+    "Large private (ATO)": "Private & Unlisted",
 }
 
 
@@ -340,8 +380,10 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
     if not parts:
         return pd.DataFrame()
     out = pd.concat(parts, ignore_index=True, sort=False)
+    # Add BD-friendly "Listed" column (ASX Listed / Private & Unlisted)
+    out["Listed"] = out["Cohort"].map(_COHORT_TO_LISTED).fillna("Private & Unlisted")
     out = out.sort_values(
-        ["Cohort", "Years to Target"],
+        ["Listed", "Years to Target"],
         ascending=[True, True],
         na_position="last",
     ).reset_index(drop=True)
@@ -353,6 +395,28 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
     # Apply researched overlay (verified target data from external web research)
     from modules.researched import apply_overlay
     out = apply_overlay(out)
+
+    # ── Normalise Target Classification to 6-tier taxonomy for SBTi companies ──
+    # The raw SBTi dataset "Target Classification" field contains ambition labels
+    # like "1.5°C aligned" or "Well-Below 2°C" — not the BD 6-tier taxonomy.
+    # Fix this by inferring the correct tier from Near-term Status.  We only touch
+    # rows where the current value is NOT already a valid 6-tier value (i.e., the
+    # research overlay has already set the correct value for researched companies).
+    from modules.country_profile import infer_target_classification as _infer_tc
+    _VALID_TC = {
+        "No public target", "Aspirational", "Net-zero only",
+        "Quantitative non-validated", "SBTi committed", "Targets set",
+    }
+    _needs_tc_fix = (
+        out["SBTi"].eq("Yes")
+        & ~out["Target Classification"].astype(str).str.strip().isin(_VALID_TC)
+    )
+    if _needs_tc_fix.any():
+        _fixed = out[_needs_tc_fix].apply(_infer_tc, axis=1)
+        out.loc[_needs_tc_fix, "Target Classification"] = _fixed
+        out.loc[_needs_tc_fix, "Target Classification (Long)"] = _fixed
+    # ───────────────────────────────────────────────────────────────────────────
+
     # Attach ASX listing data (authoritative — overrides ISIN/proxy logic)
     from modules.asx_listings import attach_asx_listing
     out = attach_asx_listing(out)
@@ -373,6 +437,28 @@ def build_all(df: pd.DataFrame) -> pd.DataFrame:
     else:
         out["Safeguard"] = ""
         out["Safeguard Covered (tCO2e)"] = None
+    # NGER Reporter flag with basis note
+    def _nger_flag(row: pd.Series) -> str:
+        if row.get("Cohort") == "NGER reporters (not in cohort)":
+            return "Yes — NGER register"
+        if str(row.get("Safeguard", "")) == "Yes":
+            return "Yes — Safeguard (inferred)"
+        return "No"
+    out["NGER Reporter"] = out.apply(_nger_flag, axis=1)
+
+    # Profile Source — where did this company's climate data come from?
+    _SOURCE_MAP = {
+        "ASX listed (SBTi)": "SBTi Companies Taking Action",
+        "Australian Corporate / FI (SBTi, private)": "SBTi Companies Taking Action",
+        "ASX 200 — no SBTi target": "ASX 200 research cohort",
+        "NGER reporters (not in cohort)": "NGER register",
+        "Large private (ATO)": "ATO Tax Transparency",
+    }
+    out["Profile Source"] = out["Cohort"].map(_SOURCE_MAP).fillna("Research")
+    # Flag companies where the research overlay updated the target data
+    if "Research Source URL" in out.columns:
+        has_overlay = out["Research Source URL"].notna() & (out["Research Source URL"].str.strip() != "")
+        out.loc[has_overlay, "Profile Source"] = out.loc[has_overlay, "Profile Source"] + " + research overlay"
     return out
 
 
@@ -408,6 +494,26 @@ def build_screen(df: pd.DataFrame, cohort: str = "ASX listed (SBTi)") -> pd.Data
             except Exception:
                 continue
         sub = build_nger_only_cohort(already)
+        if sub.empty:
+            return sub
+        extra = sub.apply(assess_row, axis=1, result_type="expand")
+        out = pd.concat([sub.reset_index(drop=True), extra.reset_index(drop=True)], axis=1)
+        return out
+
+    if cohort == "Large private (ATO)":
+        from modules.ato import build_ato_cohort
+        # Pass all existing cohort names so ATO companies that already appear
+        # elsewhere (SBTi, ASX 200, NGER) are excluded.
+        already = []
+        for other in ("ASX listed (SBTi)", "Australian Corporate / FI (SBTi, private)",
+                      "ASX 200 — no SBTi target", "NGER reporters (not in cohort)"):
+            try:
+                other_sub = build_screen(df, cohort=other)
+                if not other_sub.empty:
+                    already.extend(other_sub["Company Name"].astype(str).tolist())
+            except Exception:
+                continue
+        sub = build_ato_cohort(already)
         if sub.empty:
             return sub
         extra = sub.apply(assess_row, axis=1, result_type="expand")

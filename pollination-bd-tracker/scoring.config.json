@@ -1,0 +1,56 @@
+{
+  "_comment": "Edit weights here, then run: py scripts/rescore.py to update the database",
+  "_formula": "Weighted average: (asrs*0.25) + (target_gap*0.30) + (risk*0.25) + (intent*0.10) + (relationship*0.10), scaled to 1-5",
+
+  "weights": {
+    "asrs_urgency": 0.25,
+    "target_gap": 0.30,
+    "risk_signals": 0.25,
+    "intent_signals": 0.10,
+    "relationship": 0.10
+  },
+
+  "asrs_urgency": {
+    "Group 1": 5,
+    "Group 2": 3,
+    "Group 3": 2,
+    "Unclassified": 1
+  },
+
+  "target_gap": {
+    "No public target": 5,
+    "Aspirational": 4,
+    "Net-zero only": 4,
+    "sbti_removed": 5,
+    "sbti_pre_2023": 4,
+    "sbti_2023_2024": 3,
+    "Quantitative non-validated": 2,
+    "SBTi committed": 3,
+    "Targets set": 1
+  },
+
+  "risk_signals": {
+    "greenwashing_case": 5,
+    "sbti_removed": 5,
+    "safeguard_covered": 4,
+    "target_year_within_2_years": 3,
+    "delivery_behind": 3,
+    "delivery_significantly_behind": 4,
+    "default": 1
+  },
+
+  "intent_signals": {
+    "asrs_mentioned_report": 5,
+    "agm_climate_item": 4,
+    "race_to_zero_member": 3,
+    "nzt_published_plan": 2,
+    "default": 1
+  },
+
+  "relationship": {
+    "current_client": 0,
+    "past_client": 5,
+    "warm_contact": 3,
+    "none": 1
+  }
+}

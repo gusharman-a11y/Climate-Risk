@@ -32,7 +32,11 @@ def _csv_path() -> Path | None:
     if env:
         p = Path(env)
         return p if p.exists() else None
-    # Try local data/ directory first
+    # Try data/cer/ (bundled in repo)
+    bundled = DATA_DIR / "cer" / "baselines-and-emissions.csv"
+    if bundled.exists():
+        return bundled
+    # Try legacy data/ flat path
     local = DATA_DIR / "safeguard_baselines.csv"
     if local.exists():
         return local

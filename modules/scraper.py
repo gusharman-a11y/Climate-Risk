@@ -75,57 +75,117 @@ def _extract_year(s):
 
 
 def _row_scope(row):
-    """Identify which scope a table row refers to, if any."""
+    """Identify which scope a table row refers to, if any.
+
+    Handles standard "Scope 1/2/3" labels and common Australian SR synonyms
+    ("Direct emissions", "Energy indirect", "Other indirect").  Prefers rows
+    containing "total" because they are the aggregate we want — previously these
+    were incorrectly excluded.
+    """
     if not row:
         return None
     text = " ".join(str(c) for c in row[:3] if c).lower()
-    # Skip rows about targets/baselines/changes — we want absolute emissions
-    if "target" in text or "baseline" in text or "% change" in text or "reduction" in text:
+    # Skip rows about targets, baselines, intensity or % changes
+    if re.search(r"\btarget\b|\bbaseline\b|%\s*change|\breduction\b|\bintensity\b", text):
         return None
-    if re.search(r"\bscope\s*1\b", text) and "total" not in text:
-        if re.search(r"scope\s*1\s*[,&+]|scope\s*1\s*and", text):
+
+    # ── Scope 2 first so "Scope 1 and Scope 2" doesn't match as S1 ──────────
+    if re.search(r"\bscope\s*2\b|energy\s+indirect|purchased\s+electricity", text):
+        # Skip rows that are a combined Scope 1+2 aggregate
+        if re.search(r"scope\s*1", text) and not re.search(r"\btotal\s+scope\s*2\b", text):
             return None
-        return "s1"
-    if re.search(r"\bscope\s*2\b", text):
         if "market" in text:
             return "s2_market"
         if "location" in text:
             return "s2_location"
         return "s2"
-    if re.search(r"\bscope\s*3\b", text):
-        if re.search(r"scope\s*3\s*category\s*\d+", text):
+
+    # ── Scope 1 ──────────────────────────────────────────────────────────────
+    if re.search(r"\bscope\s*1\b|direct\s+(?:ghg\s+)?emissions|direct\s+combustion", text):
+        # Skip combined Scope 1+2 or Scope 1+2+3 rows
+        if re.search(r"scope\s*[23]|scope\s*1\s*[,&+]", text):
+            return None
+        return "s1"
+
+    # ── Scope 3 ──────────────────────────────────────────────────────────────
+    if re.search(r"\bscope\s*3\b|other\s+indirect|value\s+chain", text):
+        # Skip individual category rows (Category 1, Category 2, …)
+        if re.search(r"categor[yi]\s*\d+", text):
             return None
         return "s3"
+
     return None
 
 
+def _table_unit_hint(table) -> str:
+    """Scan the first few rows/cells of a table for a unit declaration.
+
+    Returns e.g. 'tco2e', 'ktco2e', 'mtco2e' — or '' if none found.
+    Most Australian reports embed the unit in a column header like
+    "(tCO2-e)" or "Mt CO2-e" or "Tonnes CO2-e".
+    """
+    if not table:
+        return ""
+    for row in table[:5]:
+        for cell in (row or []):
+            if cell:
+                m = _UNIT_RX.search(str(cell))
+                if m:
+                    return m.group(0).lower()
+    return ""
+
+
 def _candidate_from_table(table):
-    """Walk a table looking for Scope 1/2/3 rows with numeric year columns."""
+    """Walk a table looking for Scope 1/2/3 rows with numeric year columns.
+
+    Improvements over v1:
+    - Detect table-level unit (e.g. 'Mt CO2-e' in header) and scale all values
+    - Tag candidates as is_total so _pick() can prefer the aggregate row
+    - Try to pull unit from individual cells if different from table header
+    """
     if not table or len(table) < 2:
         return []
+
+    table_unit = _table_unit_hint(table)
+
     header_years = []
     header_idx = -1
-    for i, row in enumerate(table[:4]):
-        years = [_extract_year(c) for c in row]
+    for i, row in enumerate(table[:5]):
+        years = [_extract_year(c) for c in (row or [])]
         non_none = sum(1 for y in years if y)
         if non_none >= 2:
             header_years = years
             header_idx = i
             break
+
     candidates = []
     data_rows = table[header_idx + 1:] if header_idx >= 0 else table
     for row in data_rows:
         scope = _row_scope(row)
         if not scope:
             continue
+
+        row_text = " | ".join(str(c) for c in row if c)
+        is_total = bool(re.search(r"\btotal\b", row_text, re.I))
+
+        # Per-row unit override (some reports mix units across rows)
+        row_unit_m = _UNIT_RX.search(row_text)
+        unit_hint = row_unit_m.group(0) if row_unit_m else table_unit
+
         for col_idx, cell in enumerate(row):
-            num = _to_float(str(cell))
+            cell_str = str(cell or "").strip()
+            if not cell_str:
+                continue
+            num = _to_float(cell_str)
             if num is None or abs(num) < 1:
                 continue
             year = header_years[col_idx] if 0 <= col_idx < len(header_years) else None
+            scaled = _normalise_to_tco2e(num, unit_hint)
             candidates.append({
-                "scope": scope, "year": year, "value": num,
-                "row_text": " | ".join(str(c) for c in row if c)[:200],
+                "scope": scope, "year": year,
+                "value": scaled, "raw_value": num, "unit": unit_hint,
+                "is_total": is_total,
+                "row_text": row_text[:200],
             })
     return candidates
 
@@ -175,45 +235,76 @@ def parse_emissions(pdf_bytes):
         cs = [c for c in all_table_candidates if c["scope"] in scope_keys]
         if not cs:
             return None
-        with_year = [c for c in cs if c.get("year")]
+        # Prefer total-row candidates (e.g. "Total Scope 1") over sub-rows
+        total_cs = [c for c in cs if c.get("is_total")]
+        pool = total_cs if total_cs else cs
+        # Among pool, prefer candidates with a year; take the latest year
+        with_year = [c for c in pool if c.get("year")]
         if with_year:
             return max(with_year, key=lambda c: (c["year"], c["value"]))
-        return max(cs, key=lambda c: c["value"])
+        return max(pool, key=lambda c: c["value"])
 
     s1 = _pick(["s1"])
     if s1:
         findings["s1"] = s1["value"]
-        sources["s1"] = f"Table (year={s1.get('year') or '?'}): {s1['row_text']}"
+        sources["s1"] = (
+            f"Table (year={s1.get('year') or '?'}, unit={s1.get('unit') or 't'}): "
+            f"{s1['row_text']}"
+        )
     s2 = _pick(["s2_market"]) or _pick(["s2"]) or _pick(["s2_location"])
     if s2:
         findings["s2"] = s2["value"]
-        sources["s2"] = f"Table (year={s2.get('year') or '?'}): {s2['row_text']}"
+        sources["s2"] = (
+            f"Table (year={s2.get('year') or '?'}, unit={s2.get('unit') or 't'}): "
+            f"{s2['row_text']}"
+        )
     s3 = _pick(["s3"])
     if s3:
         findings["s3"] = s3["value"]
-        sources["s3"] = f"Table (year={s3.get('year') or '?'}): {s3['row_text']}"
+        sources["s3"] = (
+            f"Table (year={s3.get('year') or '?'}, unit={s3.get('unit') or 't'}): "
+            f"{s3['row_text']}"
+        )
 
-    # Regex fallback for any scope not yet found
-    text = full.lower()
-    fallback_patterns = [
-        (re.compile(rf"scope\s*1\b[^a-z0-9\n]{{0,60}}({_NUM})", re.I), "s1"),
-        (re.compile(rf"scope\s*2\b[^a-z0-9\n]{{0,60}}({_NUM})", re.I), "s2"),
-        (re.compile(rf"scope\s*3\b[^a-z0-9\n]{{0,60}}({_NUM})", re.I), "s3"),
+    # ── Regex fallback: runs for any scope not found in tables ───────────────
+    # Patterns search up to 120 chars including newlines so they bridge the
+    # common layout where "Scope 1" appears on one line and the value on the next.
+    _SCOPE_INLINE = re.compile(
+        rf"(?:scope\s*{{scope_n}}|direct\s+(?:ghg\s+)?emissions)"
+        rf"[^\d\n]{{0,120}}({_NUM})"
+        rf"(?:[^\S\n]{{0,30}}({_UNIT_RX.pattern}))?",
+        re.I | re.S,
+    )
+    _FALLBACK = [
+        (re.compile(
+            rf"scope\s*1\b.{{0,120}}?({_NUM})\s*(?:({_UNIT_RX.pattern}))?",
+            re.I | re.S,
+        ), "s1"),
+        (re.compile(
+            rf"scope\s*2\b.{{0,120}}?({_NUM})\s*(?:({_UNIT_RX.pattern}))?",
+            re.I | re.S,
+        ), "s2"),
+        (re.compile(
+            rf"scope\s*3\b.{{0,120}}?({_NUM})\s*(?:({_UNIT_RX.pattern}))?",
+            re.I | re.S,
+        ), "s3"),
     ]
-    for pat, key in fallback_patterns:
+
+    text = full
+    for pat, key in _FALLBACK:
         if findings[key] is not None:
             continue
         for m in pat.finditer(text):
             num = _to_float(m.group(1))
             if num is None or num < 1:
                 continue
-            tail = text[m.end():m.end() + 30]
-            unit_hint = ""
-            um = _UNIT_RX.search(tail)
-            if um:
-                unit_hint = um.group(0)
+            unit_hint = m.group(2) or ""
+            if not unit_hint:
+                tail = text[m.end(): m.end() + 40]
+                um = _UNIT_RX.search(tail)
+                unit_hint = um.group(0) if um else ""
             findings[key] = _normalise_to_tco2e(num, unit_hint)
-            sources[key] = f"Regex: {m.group(0)[:160]}"
+            sources[key] = f"Regex: …{m.group(0)[:160].strip()}…"
             break
 
     return {
@@ -225,6 +316,46 @@ def parse_emissions(pdf_bytes):
         "snippets": sources,
         "emissions_candidates": all_table_candidates,
     }
+
+def debug_extract(pdf_bytes: bytes, max_pages: int = 20) -> dict:
+    """Return raw pdfplumber extraction for debugging: full text + table dumps.
+
+    Use this in the UI's expander to show what pdfplumber actually sees — the
+    fastest way to diagnose why a PDF is not matching.
+
+    Returns:
+        {
+          "pages": [{"page": n, "text": "...", "tables": [[row,...], ...]}, ...],
+          "total_pages": N,
+          "text_chars": total chars extracted,
+        }
+    """
+    try:
+        import pdfplumber
+    except ImportError:
+        return {"error": "pdfplumber not installed"}
+
+    pages = []
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        total = len(pdf.pages)
+        for page in pdf.pages[:max_pages]:
+            t = page.extract_text() or ""
+            try:
+                tbls = page.extract_tables() or []
+            except Exception:
+                tbls = []
+            if t.strip() or tbls:
+                pages.append({
+                    "page": page.page_number,
+                    "text": t[:2000],  # cap per page to keep it readable
+                    "tables": tbls[:3],  # first 3 tables per page
+                })
+    return {
+        "pages": pages,
+        "total_pages": total,
+        "text_chars": sum(len(p["text"]) for p in pages),
+    }
+
 
 # ─── HTTP fetch ──────────────────────────────────────────────────────────────
 

@@ -42,7 +42,7 @@ GROUP_2 = AsrsGroup(
     mandatory_from="2026-07-01",
     revenue_aud=200_000_000,
     assets_aud=500_000_000,
-    employees=500,
+    employees=250,   # s292A Corporations Act: 250 employees (not 500)
 )
 
 GROUP_3 = AsrsGroup(
@@ -127,6 +127,32 @@ def bd_priority_label(score: int) -> str:
     return "🟢 Low"
 
 
+_GROUP_DEADLINE = {
+    "Group 1": "mandatory now (FY2025/26)",
+    "Group 2": "mandatory FY2026/27",
+    "Group 3": "mandatory FY2027/28",
+    "Unclassified": "ASRS group unconfirmed",
+}
+
+_TARGET_GAP_NOTE = {
+    "No public target": "no public climate target — ASRS disclosure without any strategy",
+    "Aspirational": "aspirational target only — no near-term quantitative pathway",
+    "Net-zero only": "net-zero commitment but no near-term science-based target",
+    "Quantitative non-validated": "quantitative target set but not independently validated",
+    "SBTi committed": "SBTi intent letter submitted — target validation in progress",
+    "Targets set": "SBTi validated — monitor for V2 reset or delivery gap",
+}
+
+
+def bd_rationale(target_classification: str, asrs_group: str) -> str:
+    """One-line plain-English BD rationale for reviewers."""
+    tc = str(target_classification).strip()
+    grp = str(asrs_group).strip()
+    deadline = _GROUP_DEADLINE.get(grp, "ASRS group unconfirmed")
+    gap = _TARGET_GAP_NOTE.get(tc, "target status unclear")
+    return f"{grp} — {deadline}; {gap}"
+
+
 # ── Group classifier ───────────────────────────────────────────────────────────
 
 def _meets_group(row: pd.Series, g: AsrsGroup) -> bool:
@@ -195,4 +221,8 @@ def add_asrs_columns(df: pd.DataFrame) -> pd.DataFrame:
             axis=1,
         )
         df["BD Priority"] = df["BD Priority Score"].apply(bd_priority_label)
+        df["BD Rationale"] = df.apply(
+            lambda r: bd_rationale(r.get(target_col, ""), r.get("ASRS Group", "")),
+            axis=1,
+        )
     return df
