@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weddings &amp; Celebrations — TREVENNA | Barn Wedding Venue, Cornwall</title>
+<meta name="description" content="Trevenna is an exclusive-use barn wedding venue set in 142 acres of Cornish countryside at St Neot. Browse our wedding weekends, ceremonies, feasts and keepsakes.">
+<style>
+  :root{
+    --cream:#faf7f0;
+    --paper:#fffdf8;
+    --ink:#2e2a24;
+    --soft:#6b6257;
+    --sage:#7c8a6e;
+    --sage-dark:#5c6a50;
+    --clay:#c8a171;
+    --line:#e5ddcd;
+    --shadow:0 10px 30px rgba(46,42,36,.08);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:Georgia,'Times New Roman',serif;
+    background:var(--cream);
+    color:var(--ink);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  .sans{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif}
+  img,svg{max-width:100%;display:block}
+  a{color:inherit}
+
+  /* ---------- announcement bar ---------- */
+  .bar{
+    background:var(--sage-dark);color:#f4f2ea;text-align:center;
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;
+    padding:.55rem 1rem;
+  }
+
+  /* ---------- header ---------- */
+  header{
+    background:var(--paper);border-bottom:1px solid var(--line);
+    position:sticky;top:0;z-index:50;
+  }
+  .head-inner{
+    max-width:1180px;margin:0 auto;padding:1.1rem 1.5rem;
+    display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;
+  }
+  .logo{line-height:1.15;text-decoration:none}
+  .logo .name{font-size:1.55rem;letter-spacing:.32em;font-weight:400}
+  .logo .tag{
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    font-size:.62rem;letter-spacing:.3em;text-transform:uppercase;color:var(--soft);
+  }
+  nav{display:flex;gap:1.6rem;flex-wrap:wrap}
+  nav a{
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;
+    text-decoration:none;color:var(--ink);padding-bottom:2px;
+    border-bottom:1px solid transparent;transition:border-color .2s;
+  }
+  nav a:hover{border-color:var(--clay)}
+
+  /* ---------- hero ---------- */
+  .hero{
+    background:
+      radial-gradient(1200px 500px at 50% -150px, #efe9da 0%, transparent 70%),
+      var(--cream);
+    text-align:center;padding:4.5rem 1.5rem 3.5rem;
+  }
+  .hero .kicker{
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    font-size:.72rem;letter-spacing:.34em;text-transform:uppercase;color:var(--sage-dark);
+  }
+  .hero h1{
+    font-weight:400;font-size:clamp(2.1rem,5vw,3.4rem);
+    letter-spacing:.04em;margin:.9rem auto .4rem;max-width:18ch;line-height:1.2;
+  }
+  .hero h1 em{font-style:italic;color:var(--sage-dark)}
+  .hero p{max-width:62ch;margin:1.1rem auto 0;color:var(--soft);font-size:1.05rem}
+  .hero .rule{width:64px;height:1px;background:var(--clay);margin:2rem auto 0}
+
+  .hero-art{max-width:760px;margin:2.6rem auto 0}
+  .hero-art svg{width:100%;height:auto}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    display:inline-block;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;text-decoration:none;
+    padding:.85rem 1.9rem;border:1px solid var(--ink);color:var(--ink);
+    background:transparent;transition:all .25s;cursor:pointer;
+  }
+  .btn:hover{background:var(--ink);color:var(--cream)}
+  .btn.solid{background:var(--ink);color:var(--cream)}
+  .btn.solid:hover{background:var(--sage-dark);border-color:var(--sage-dark)}
+
+  /* ---------- sections ---------- */
+  section{padding:4rem 1.5rem}
+  .wrap{max-width:1180px;margin:0 auto}
+  .sec-head{text-align:center;max-width:66ch;margin:0 auto 3rem}
+  .sec-head .kicker{
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    font-size:.7rem;letter-spacing:.32em;text-transform:uppercase;color:var(--sage-dark);
+  }
+  .sec-head h2{font-weight:400;font-size:clamp(1.6rem,3.4vw,2.3rem);margin:.7rem 0 .8rem;letter-spacing:.03em}
+  .sec-head p{color:var(--soft)}
+
+  /* ---------- shop grid ---------- */
+  .grid{
+    display:grid;gap:2.2rem;
+    grid-template-columns:repeat(auto-fill,minmax(255px,1fr));
+  }
+  .card{
+    background:var(--paper);border:1px solid var(--line);
+    display:flex;flex-direction:column;box-shadow:var(--shadow);
+    transition:transform .25s, box-shadow .25s;
+  }
+  .card:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(46,42,36,.13)}
+  .card .art{
+    background:#f2eee2;border-bottom:1px solid var(--line);
+    aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;padding:1.2rem;
+  }
+  .card .art svg{width:88%;height:auto}
+  .card .body{padding:1.3rem 1.3rem 1.5rem;display:flex;flex-direction:column;flex:1}
+  .card .cat{
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    font-size:.62rem;letter-spacing:.26em;text-transform:uppercase;color:var(--clay);
+  }
+  .card h3{font-weight:400;font-size:1.18rem;margin:.45rem 0 .5rem;letter-spacing:.02em}
+  .card p{font-size:.92rem;color:var(--soft);flex:1}
+  .card .price{
+    margin-top:1rem;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    font-size:.85rem;letter-spacing:.08em;color:var(--ink);
+  }
+  .card .price small{color:var(--soft);letter-spacing:.04em}
+  .card .btn{margin-top:.9rem;text-align:center;padding:.7rem 1rem;font-size:.66rem}
+
+  /* ---------- band / story ---------- */
+  .band{background:var(--sage-dark);color:#f4f2ea;text-align:center}
+  .band blockquote{
+    font-style:italic;font-size:clamp(1.2rem,2.6vw,1.7rem);max-width:34ch;margin:0 auto;line-height:1.5;
+  }
+  .band cite{
+    display:block;margin-top:1.4rem;font-style:normal;
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+    font-size:.7rem;letter-spacing:.28em;text-transform:uppercase;color:#cfd6c3;
+  }
+
+  .split{display:grid;gap:3rem;grid-template-columns:1fr 1fr;align-items:center}
+  @media(max-width:820px){.split{grid-template-columns:1fr}}
+  .split h2{font-weight:400;font-size:clamp(1.5rem,3vw,2.1rem);margin-bottom:1rem;letter-spacing:.03em}
+  .split p{color:var(--soft);margin-bottom:1rem}
+  .split ul{list-style:none;margin:1.2rem 0 1.6rem}
+  .split li{
+    padding:.55rem 0 .55rem 1.6rem;border-bottom:1px solid var(--line);
+    font-size:.95rem;position:relative;
+  }
+  .split li::before{content:"—";position:absolute;left:0;color:var(--clay)}
+  .frame{background:var(--paper);border:1px solid var(--line);box-shadow:var(--shadow);padding:1.4rem}
+  .frame svg{width:100%;height:auto}
+
+  /* ---------- steps ---------- */
+  .steps{display:grid;gap:2rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .step{text-align:center;padding:0 .5rem}
+  .step .num{
+    width:52px;height:52px;border:1px solid var(--clay);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;
+    font-style:italic;font-size:1.15rem;color:var(--sage-dark);
+  }
+  .step h3{font-weight:400;font-size:1.05rem;margin-bottom:.4rem}
+  .step p{font-size:.9rem;color:var(--soft)}
+
+  /* ---------- faq ---------- */
+  .faq{max-width:760px;margin:0 auto}
+  details{border-bottom:1px solid var(--line);padding:1.1rem 0}
+  summary{
+    cursor:pointer;font-size:1.05rem;list-style:none;display:flex;justify-content:space-between;gap:1rem;
+  }
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";color:var(--clay);font-size:1.2rem}
+  details[open] summary::after{content:"–"}
+  details p{margin-top:.7rem;color:var(--soft);font-size:.95rem}
+
+  /* ---------- footer ---------- */
+  footer{background:var(--ink);color:#d8d2c6;padding:3.5rem 1.5rem 2rem}
+  .foot{
+    max-width:1180px;margin:0 auto;display:grid;gap:2.5rem;
+    grid-template-columns:2fr 1fr 1fr;
+  }
+  @media(max-width:720px){.foot{grid-template-columns:1fr}}
+  footer .name{font-size:1.3rem;letter-spacing:.32em;color:#f4f2ea}
+  footer .tag{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:.62rem;letter-spacing:.3em;text-transform:uppercase;color:#9a938a;margin-top:.3rem}
+  footer h4{
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-weight:400;
+    font-size:.68rem;letter-spacing:.28em;text-transform:uppercase;color:#f4f2ea;margin-bottom:1rem;
+  }
+  footer p, footer a{font-size:.9rem;color:#c9c2b5;text-decoration:none;line-height:2}
+  footer a:hover{color:#fff}
+  .fineprint{
+    max-width:1180px;margin:2.5rem auto 0;padding-top:1.5rem;border-top:1px solid #4a453d;
+    font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:.68rem;letter-spacing:.1em;color:#8f8880;
+    display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;
+  }
+</style>
+</head>
+<body>
+
+<div class="bar">Exclusive-use barn wedding venue &nbsp;·&nbsp; 142 acres of Cornish countryside &nbsp;·&nbsp; St&nbsp;Neot, Cornwall</div>
+
+<header>
+  <div class="head-inner">
+    <a class="logo" href="#top">
+      <div class="name">TREVENNA</div>
+      <div class="tag">Weddings &amp; Celebrations · Cornwall</div>
+    </a>
+    <nav>
+      <a href="#shop">Wedding Shop</a>
+      <a href="#venue">The Venue</a>
+      <a href="#how">How It Works</a>
+      <a href="#faq">FAQs</a>
+      <a href="#visit">Book a Viewing</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ================= HERO ================= -->
+<section class="hero" id="top">
+  <div class="kicker">Weddings at Trevenna</div>
+  <h1>Your beautiful barn wedding, <em>the Cornish way</em></h1>
+  <p>Tucked into 142 acres of countryside on the edge of Bodmin Moor, Trevenna is a cluster of
+     chic converted barns that becomes exclusively yours. Browse our wedding weekends, ceremonies,
+     feasts and keepsakes below — each one shaped around you, your people and this remarkable place.</p>
+  <div class="rule"></div>
+  <div class="hero-art" aria-hidden="true">
+    <!-- hand-drawn style illustration of the Trevenna barns -->
+    <svg viewBox="0 0 760 300" fill="none" stroke="#5c6a50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- rolling hills -->
+      <path d="M10 265 Q 190 225 380 255 T 750 250" stroke="#c8a171"/>
+      <path d="M10 285 Q 250 260 480 278 T 750 275" stroke="#c8a171" opacity=".6"/>
+      <!-- main threshing barn -->
+      <path d="M240 250 V 160 L 320 110 L 400 160 V 250 Z"/>
+      <path d="M240 160 H 400" opacity=".5"/>
+      <rect x="300" y="195" width="40" height="55"/>
+      <path d="M320 195 V 250 M300 222 H 340" opacity=".5"/>
+      <rect x="258" y="185" width="22" height="26"/><path d="M269 185v26M258 198h22" opacity=".5"/>
+      <rect x="360" y="185" width="22" height="26"/><path d="M371 185v26M360 198h22" opacity=".5"/>
+      <!-- left barn (mowhay) -->
+      <path d="M120 250 V 185 L 180 148 L 240 185"/>
+      <path d="M120 185 H 240" opacity=".5"/>
+      <rect x="142" y="200" width="26" height="50"/>
+      <rect x="190" y="202" width="22" height="24"/><path d="M201 202v24M190 214h22" opacity=".5"/>
+      <!-- right stable -->
+      <path d="M400 250 V 192 L 460 158 L 520 192 V 250"/>
+      <path d="M400 192 H 520" opacity=".5"/>
+      <rect x="424" y="205" width="24" height="45"/>
+      <rect x="470" y="205" width="22" height="24"/><path d="M481 205v24M470 217h22" opacity=".5"/>
+      <!-- arbour on the hill -->
+      <path d="M600 250 v-42 M660 250 v-42 M592 208 h76 M600 208 L 630 190 L 660 208"/>
+      <path d="M606 250 q 24 -14 48 0" opacity=".5"/>
+      <!-- trees -->
+      <path d="M62 250 v-30 M62 220 q -18 4 -14 -16 q 4 -16 20 -10 q 16 -8 18 8 q 12 2 4 14 q -6 10 -28 4"/>
+      <path d="M560 250 v-24 M560 226 q -14 2 -10 -12 q 4 -12 16 -8 q 12 -6 14 6 q 10 2 2 10 q -6 8 -22 4"/>
+      <path d="M712 250 v-28 M712 222 q -16 4 -12 -14 q 4 -14 18 -9 q 14 -7 16 7 q 11 2 3 12 q -5 9 -25 4"/>
+      <!-- bunting between barns -->
+      <path d="M180 148 Q 250 128 320 110" stroke="#c8a171"/>
+      <path d="M212 139 l 5 9 l 6 -12 M252 128 l 5 9 l 6 -12 M290 118 l 5 9 l 6 -12" stroke="#c8a171"/>
+      <!-- birds -->
+      <path d="M120 70 q 6 -8 12 0 q 6 -8 12 0 M540 55 q 5 -7 10 0 q 5 -7 10 0 M620 90 q 5 -7 10 0 q 5 -7 10 0" opacity=".7"/>
+      <!-- sun -->
+      <circle cx="670" cy="52" r="20" stroke="#c8a171"/>
+    </svg>
+  </div>
+  <p style="margin-top:2.2rem"><a class="btn solid" href="#shop">Browse the Wedding Shop</a></p>
+</section>
+
+<!-- ================= SHOP ================= -->
+<section id="shop" style="background:var(--paper);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">The Wedding Shop</div>
+      <h2>Weekends, ceremonies, feasts &amp; keepsakes</h2>
+      <p>Everything here is built around exclusive use — the barns, gardens and views are yours alone.
+         Start with a weekend, then layer in the moments that make it unmistakably yours.</p>
+    </div>
+
+    <div class="grid">
+
+      <!-- 1. Signature weekend -->
+      <div class="card">
+        <div class="art" aria-hidden="true">
+          <svg viewBox="0 0 200 150" fill="none" stroke="#5c6a50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M40 120 V 70 L 100 35 L 160 70 V 120 Z"/>
+            <path d="M40 70 H 160" opacity=".5"/>
+            <rect x="86" y="85" width="28" height="35"/>
+            <path d="M100 85 V 120" opacity=".5"/>
+            <rect x="54" y="80" width="18" height="20"/><rect x="128" y="80" width="18" height="20"/>
+            <path d="M20 120 H 180" stroke="#c8a171"/>
+            <path d="M100 35 v-10 M100 25 l 14 5 l -14 5" stroke="#c8a171"/>
+            <circle cx="168" cy="28" r="10" stroke="#c8a171"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="cat">Venue Hire</div>
+          <h3>The Trevenna Weekend</h3>
+          <p>Two nights of exclusive use — the Mowhay, Threshing Barn, Garden Venue and gardens,
+             wedding catering and drinks, plus accommodation for 45 with welcome dinner and breakfasts.</p>
+          <div class="price">From £9,635 <small>· inclusive tariff</small></div>
+          <a class="btn" href="#visit">Enquire</a>
+        </div>
+      </div>
+
+      <!-- 2. Three day -->
+      <div class="card">
+        <div class="art" aria-hidden="true">
+          <svg viewBox="0 0 200 150" fill="none" stroke="#5c6a50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="100" cy="75" r="48"/>
+            <path d="M100 75 V 45 M100 75 L 122 90" stroke="#c8a171"/>
+            <path d="M100 19 v-8 M100 139 v-8 M44 75 h-8 M164 75 h-8" opacity=".6"/>
+            <path d="M62 30 q 6 -8 12 0 M136 26 q 6 -8 12 0" opacity=".7"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="cat">Venue Hire</div>
+          <h3>The Slow Wedding — Three Days</h3>
+          <p>Arrive early, exhale, and let the celebration unfold. Welcome feast on night one,
+             wedding day at the centre, and a long farewell brunch before anyone has to leave.</p>
+          <div class="price">Priced on enquiry <small>· 3-night hire</small></div>
+          <a class="btn" href="#visit">Enquire</a>
+        </div>
+      </div>
+
+      <!-- 3. Arbour ceremony -->
+      <div class="card">
+        <div class="art" aria-hidden="true">
+          <svg viewBox="0 0 200 150" fill="none" stroke="#5c6a50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M55 125 V 60 M145 125 V 60 M45 60 H 155 M55 60 L 100 32 L 145 60"/>
+            <path d="M62 125 q 38 -22 76 0" opacity=".5"/>
+            <path d="M55 60 q -10 14 4 20 M145 60 q 10 14 -4 20" stroke="#c8a171"/>
+            <path d="M20 125 H 180" stroke="#c8a171"/>
+            <path d="M30 40 q 5 -7 10 0 q 5 -7 10 0" opacity=".7"/>
+            <circle cx="170" cy="30" r="9" stroke="#c8a171"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="cat">Ceremonies</div>
+          <h3>Ceremony Under the Arbour</h3>
+          <p>Say it outside, under our handmade wood and slate arbour, with moorland views rolling
+             away behind you. Licensed indoor spaces stand ready if the Cornish weather has other ideas.</p>
+          <div class="price">Included in hire <small>· weather plan built in</small></div>
+          <a class="btn" href="#visit">Enquire</a>
+        </div>
+      </div>
+
+      <!-- 4. Wood fired feast -->
+      <div class="card">
+        <div class="art" aria-hidden="true">
+          <svg viewBox="0 0 200 150" fill="none" stroke="#5c6a50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M35 95 H 165 M45 95 V 120 M155 95 V 120 M35 120 H 165" />
+            <circle cx="100" cy="70" r="26"/>
+            <path d="M100 52 q -14 10 0 22 q 14 -12 0 -22" stroke="#c8a171"/>
+            <path d="M55 70 h 14 M131 70 h 14" opacity=".6"/>
+            <path d="M64 40 q 4 -10 -2 -16 M100 30 q 4 -10 -2 -16 M136 40 q 4 -10 -2 -16" stroke="#c8a171" opacity=".8"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="cat">Food &amp; Drink</div>
+          <h3>The Wood-Fired Feast</h3>
+          <p>Our in-house kitchen cooks with homegrown ingredients and the best of Cornish produce —
+             from elegant plated feasts to relaxed hog roasts, homemade breads and puddings worth the queue.</p>
+          <div class="price">Menus priced per person</div>
+          <a class="btn" href="#visit">Enquire</a>
+        </div>
+      </div>
+
+      <!-- 5. Threshing barn stay -->
+      <div class="card">
+        <div class="art" aria-hidden="true">
+          <svg viewBox="0 0 200 150" fill="none" stroke="#5c6a50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M40 120 V 78 h 120 V 120 M40 92 H 160"/>
+            <path d="M48 78 v -18 q 0 -8 8 -8 h 24" opacity=".7"/>
+            <circle cx="62" cy="62" r="9"/>
+            <path d="M40 120 H 24 M160 120 h 16" stroke="#c8a171"/>
+            <path d="M120 60 q 6 -8 12 0 q 6 -8 12 0" opacity=".7"/>
+            <path d="M140 40 l 3 6 l 7 1 l -5 5 l 1 7 l -6 -3 l -6 3 l 1 -7 l -5 -5 l 7 -1 Z" stroke="#c8a171"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="cat">Stay</div>
+          <h3>Threshing Barn Stay</h3>
+          <p>Our largest barn sleeps eleven in en-suite rooms with drench showers, underfloor heating
+             and handmade beds. Across the farm, the barns and Farmhouse sleep 45 of your favourite people.</p>
+          <div class="price">From £760 per night <small>· incl. breakfast for 8</small></div>
+          <a class="btn" href="#visit">Enquire</a>
+        </div>
+      </div>
+
+      <!-- 6. Evening guests -->
+      <div class="card">
+        <div class="art" aria-hidden="true">
+          <svg viewBox="0 0 200 150" fill="none" stroke="#5c6a50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M30 45 Q 100 20 170 45" stroke="#c8a171"/>
+            <path d="M52 38 l 5 10 l 7 -13 M96 30 l 5 10 l 7 -13 M140 34 l 5 10 l 7 -13" stroke="#c8a171"/>
+            <circle cx="70" cy="90" r="14"/><path d="M70 104 v 22 M56 118 h 28" />
+            <circle cx="130" cy="90" r="14"/><path d="M130 104 v 22 M116 118 h 28"/>
+            <path d="M84 96 h 32" opacity=".5"/>
+            <circle cx="100" cy="62" r="4" stroke="#c8a171"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="cat">Guests</div>
+          <h3>Day &amp; Evening Guest Additions</h3>
+          <p>Grow the party your way — welcome up to 120 guests by day and 150 by night.
+             Extra guests are simply added to your weekend at a price per person.</p>
+          <div class="price">Priced per person</div>
+          <a class="btn" href="#visit">Enquire</a>
+        </div>
+      </div>
+
+      <!-- 7. Anniversary stay voucher -->
+      <div class="card">
+        <div class="art" aria-hidden="true">
+          <svg viewBox="0 0 200 150" fill="none" stroke="#5c6a50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="45" y="45" width="110" height="70" rx="4"/>
+            <path d="M45 55 L 100 90 L 155 55" opacity=".7"/>
+            <path d="M100 32 q -10 -14 -20 -4 q -8 8 20 24 q 28 -16 20 -24 q -10 -10 -20 4" stroke="#c8a171"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="cat">Gifts</div>
+          <h3>Trevenna Gift Card</h3>
+          <p>For the couple who has everything except the honeymoon fund. Contribute to a wedding
+             weekend, an anniversary night in the barns, or a table at the feast.</p>
+          <div class="price">From £50</div>
+          <a class="btn" href="#visit">Enquire</a>
+        </div>
+      </div>
+
+      <!-- 8. Venue illustration keepsake -->
+      <div class="card">
+        <div class="art" aria-hidden="true">
+          <svg viewBox="0 0 200 150" fill="none" stroke="#5c6a50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="38" y="25" width="124" height="100"/>
+            <rect x="48" y="35" width="104" height="80" opacity=".5"/>
+            <path d="M62 100 V 78 L 88 62 L 114 78 V 100 Z"/>
+            <path d="M120 100 v-14 M136 100 v-14 M116 86 h 24 M120 86 l 8 -6 l 8 6" opacity=".8"/>
+            <path d="M56 108 h 88" stroke="#c8a171"/>
+            <circle cx="138" cy="48" r="7" stroke="#c8a171"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="cat">Keepsakes</div>
+          <h3>Personalised Venue Illustration</h3>
+          <p>A hand-drawn print of the barns where it all happened — personalised with your names
+             and date. The perfect first-anniversary gift, or a thank-you from your wedding party.</p>
+          <div class="price">From £45 <small>· A4 &amp; A3 giclée</small></div>
+          <a class="btn" href="#visit">Enquire</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ================= QUOTE BAND ================= -->
+<section class="band">
+  <blockquote>“The whole weekend felt like ours — the barns, the views, the food, all of it.
+  Our guests still talk about the feast.”</blockquote>
+  <cite>A Trevenna couple · married in the Mowhay</cite>
+</section>
+
+<!-- ================= VENUE ================= -->
+<section id="venue">
+  <div class="wrap split">
+    <div>
+      <div class="kicker sans" style="font-size:.7rem;letter-spacing:.32em;text-transform:uppercase;color:var(--sage-dark)">The Venue</div>
+      <h2>Exclusively yours, from first arrival to farewell brunch</h2>
+      <p>Trevenna sits in 142 acres of countryside at St Neot, within an Area of Outstanding
+         Natural Beauty on the edge of Bodmin Moor. When you book, every barn, garden and view
+         belongs to you and yours alone.</p>
+      <ul>
+        <li>Three licensed indoor ceremony spaces, plus outdoor ceremonies under the Arbour</li>
+        <li>The Mowhay with orchard views · the stone-walled Threshing Barn · the Garden Venue</li>
+        <li>Accommodation for 45 guests across restored barns and the Farmhouse</li>
+        <li>Up to 120 day guests and 150 evening guests</li>
+        <li>In-house kitchen cooking with homegrown and Cornish produce</li>
+      </ul>
+      <a class="btn" href="#visit">Come and See It</a>
+    </div>
+    <div class="frame" aria-hidden="true">
+      <svg viewBox="0 0 460 320" fill="none" stroke="#5c6a50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- map-style illustration of the grounds -->
+        <rect x="8" y="8" width="444" height="304" opacity=".35"/>
+        <path d="M30 250 Q 140 210 250 240 T 440 235" stroke="#c8a171"/>
+        <!-- barns cluster -->
+        <path d="M150 170 V 128 L 195 100 L 240 128 V 170 Z"/>
+        <path d="M150 128 H 240" opacity=".5"/>
+        <path d="M95 170 V 140 L 125 122 L 150 140" />
+        <path d="M240 170 V 142 L 270 124 L 300 142 V 170"/>
+        <!-- garden venue -->
+        <rect x="330" y="132" width="58" height="38"/>
+        <path d="M330 132 l 29 -16 l 29 16" opacity=".7"/>
+        <!-- orchard -->
+        <g opacity=".8">
+          <circle cx="70" cy="220" r="11"/><path d="M70 231 v 12"/>
+          <circle cx="102" cy="228" r="11"/><path d="M102 239 v 12"/>
+          <circle cx="134" cy="220" r="11"/><path d="M134 231 v 12"/>
+        </g>
+        <!-- arbour + path -->
+        <path d="M368 220 v-26 M404 220 v-26 M362 194 h 48 M368 194 l 18 -12 l 18 12"/>
+        <path d="M240 200 Q 300 220 368 214" stroke="#c8a171" stroke-dasharray="4 7"/>
+        <!-- pond -->
+        <path d="M260 275 q 25 -14 50 0 q -25 14 -50 0 Z" opacity=".7"/>
+        <!-- compass -->
+        <circle cx="410" cy="60" r="20" stroke="#c8a171"/>
+        <path d="M410 44 v 32 M394 60 h 32" stroke="#c8a171" opacity=".7"/>
+        <path d="M410 44 l 5 12 l -5 -3 l -5 3 Z" fill="#c8a171" stroke="none"/>
+        <!-- labels -->
+        <path d="M40 60 h 70 M40 72 h 46" opacity=".4"/>
+      </svg>
+      <p class="sans" style="text-align:center;font-size:.65rem;letter-spacing:.26em;text-transform:uppercase;color:var(--soft);margin-top:1rem">Trevenna · St Neot · Cornwall</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section id="how" style="background:var(--paper);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">How It Works</div>
+      <h2>From first viewing to first dance</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <h3>Come for a viewing</h3>
+        <p>Walk the barns and gardens with us. Viewings run Wednesdays, Fridays and Sundays at
+           12 noon and 1:15pm, by appointment.</p>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <h3>Choose your weekend</h3>
+        <p>Pick one, two or three nights and hold your date. Your inclusive tariff covers the venue,
+           catering, drinks and guest accommodation.</p>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <h3>Shape the details</h3>
+        <p>Taste menus with our kitchen, choose your ceremony spot, and add the extras —
+           feasts, guests, keepsakes — that make it yours.</p>
+      </div>
+      <div class="step">
+        <div class="num">4</div>
+        <h3>Live it slowly</h3>
+        <p>Arrive the day before, marry among the barns, and wake up to breakfast with everyone
+           you love still around the table.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FAQ ================= -->
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="kicker">Good to Know</div>
+      <h2>Questions couples ask us</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>How many guests can we bring?</summary>
+        <p>Up to 120 guests for the day and 150 in the evening, with accommodation on-site for 45
+           across the restored barns and Farmhouse.</p>
+      </details>
+      <details>
+        <summary>Can we marry outdoors?</summary>
+        <p>Yes — under the wood and slate Arbour with countryside views, or in the gardens. We also
+           hold three licensed indoor ceremony spaces, so the weather never gets a vote it can win.</p>
+      </details>
+      <details>
+        <summary>Do we have to use your caterers?</summary>
+        <p>Food and drink is one of the things Trevenna is loved for — our in-house kitchen cooks
+           with homegrown ingredients and the best of Cornish produce, and menus are shaped with
+           you, from formal feasts to relaxed hog roasts.</p>
+      </details>
+      <details>
+        <summary>What does “exclusive use” actually mean?</summary>
+        <p>Exactly what it says. For your one, two or three nights there are no other bookings, no
+           other couples and no strangers at breakfast — every barn, garden and view is yours.</p>
+      </details>
+      <details>
+        <summary>Where exactly are you?</summary>
+        <p>At St Neot, near Liskeard in south-east Cornwall — inside an Area of Outstanding Natural
+           Beauty on the southern edge of Bodmin Moor, and easier to reach than it feels once you're here.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ================= VISIT / CTA ================= -->
+<section id="visit" style="background:var(--sage-dark);color:#f4f2ea;text-align:center">
+  <div class="kicker sans" style="font-size:.7rem;letter-spacing:.32em;text-transform:uppercase;color:#cfd6c3">Book a Viewing</div>
+  <h2 style="font-weight:400;font-size:clamp(1.6rem,3.4vw,2.3rem);margin:.8rem 0 1rem;letter-spacing:.03em">Come and stand in the Mowhay</h2>
+  <p style="max-width:56ch;margin:0 auto 2rem;color:#e2e6d8">Photos only get you so far. Come and see the barns, walk the gardens and
+     picture your people here. Viewings by appointment — Wednesdays, Fridays and Sundays at 12 noon and 1:15pm.</p>
+  <p>
+    <a class="btn" style="border-color:#f4f2ea;color:#f4f2ea" href="mailto:weddings@trevenna.co.uk"
+       onmouseover="this.style.background='#f4f2ea';this.style.color='#5c6a50'"
+       onmouseout="this.style.background='transparent';this.style.color='#f4f2ea'">weddings@trevenna.co.uk</a>
+  </p>
+  <p class="sans" style="margin-top:1.4rem;font-size:.78rem;letter-spacing:.2em;color:#cfd6c3">OR CALL 01579 320013</p>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="foot">
+    <div>
+      <div class="name">TREVENNA</div>
+      <div class="tag">Weddings &amp; Celebrations · Cornwall</div>
+      <p style="margin-top:1rem;max-width:38ch">A cluster of chic converted barns in 142 acres of
+         Cornish countryside — exclusively yours for one, two or three beautiful days.</p>
+    </div>
+    <div>
+      <h4>Find Us</h4>
+      <p>Trevenna<br>St Neot, Liskeard<br>Cornwall PL14 6HR</p>
+    </div>
+    <div>
+      <h4>Say Hello</h4>
+      <p><a href="mailto:weddings@trevenna.co.uk">weddings@trevenna.co.uk</a><br>
+         <a href="tel:+441579320013">01579 320013</a><br>
+         <a href="https://www.trevenna.co.uk">trevenna.co.uk</a></p>
+    </div>
+  </div>
+  <div class="fineprint">
+    <span>© 2026 TREVENNA · ST NEOT · CORNWALL</span>
+    <span>WEDDINGS FROM £9,635 · EXCLUSIVE USE · SLEEPS 45</span>
+  </div>
+</footer>
+
+</body>
+</html>
