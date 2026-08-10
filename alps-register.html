@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register — Run.Ride the Alps 2027 | South End</title>
+<meta name="description" content="Register your interest for Run.Ride the Alps 2027 — hut-to-hut trail running in the Dolomites and riding the great cols. By South End.">
+<meta name="theme-color" content="#16161A">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='9' fill='%2316161A'/%3E%3Ctext x='24' y='33' font-family='Helvetica,Arial,sans-serif' font-size='23' font-weight='700' fill='%23EDEBE5' text-anchor='middle'%3ESE%3C/text%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="South End">
+<meta property="og:title" content="Register — Run.Ride the Alps 2027">
+<meta property="og:description" content="Put your name down for next year. Run the Dolomites, ride the cols.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&family=Inter:wght@300;400;500&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#16161A;--paper:#EDEBE5;--paper-2:#E4E1D8;--stone:#9A988F;
+  --line:rgba(22,22,26,0.13);--line-soft:rgba(22,22,26,0.07);--clay:#B5613D;
+}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;font-weight:300;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:24px 48px;mix-blend-mode:difference}
+.nav-mark{font-family:'Schibsted Grotesk',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.3em;text-transform:uppercase;color:#fff;text-decoration:none}
+.nav-links{display:flex;gap:32px;list-style:none}
+.nav-links a{font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#fff;text-decoration:none;opacity:0.85;transition:opacity .2s}
+.nav-links a:hover{opacity:0.5}
+
+.hero{height:62vh;min-height:440px;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+.hero-motion{position:absolute;inset:-6%;background:url('https://commons.wikimedia.org/wiki/Special:FilePath/Seceda_2.jpg?width=2200') center/cover;animation:kb 30s ease-in-out infinite alternate;filter:saturate(0.85) contrast(1.07) brightness(0.93) sepia(0.1)}
+@keyframes kb{0%{transform:scale(1.06) translate(2%,1%)}100%{transform:scale(1.16) translate(-2%,-1.5%)}}
+.hero::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(22,22,26,0.34) 0%,rgba(22,22,26,0.06) 40%,rgba(22,22,26,0.6) 100%)}
+.hero-motion::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:0.07;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:220px}
+.hero-body{position:relative;z-index:3;padding:0 48px 56px;color:var(--paper)}
+.hb-eyebrow{font-size:11px;letter-spacing:0.4em;text-transform:uppercase;color:rgba(237,235,229,0.85);margin-bottom:20px;display:block}
+.hb-title{font-family:'Schibsted Grotesk',sans-serif;font-weight:800;font-size:clamp(3rem,9vw,7.5rem);line-height:0.88;letter-spacing:-0.025em;margin-bottom:24px}
+.hb-sub{font-size:15px;line-height:1.6;max-width:620px;color:rgba(237,235,229,0.9)}
+
+.sec{max-width:1180px;margin:0 auto;padding:90px 48px}
+.sec-tag{font-family:'Schibsted Grotesk',sans-serif;font-size:11px;font-weight:500;letter-spacing:0.35em;text-transform:uppercase;color:var(--stone);margin-bottom:16px;display:block}
+.sec-h{font-family:'Schibsted Grotesk',sans-serif;font-weight:700;font-size:clamp(2rem,4.5vw,3.4rem);line-height:0.98;letter-spacing:-0.015em;margin-bottom:30px}
+.route-prose{font-size:clamp(1.05rem,1.7vw,1.4rem);font-weight:300;color:var(--ink);line-height:1.7;max-width:920px;margin-bottom:14px}
+.route-prose b{font-weight:500}
+
+.reg-grid{display:grid;grid-template-columns:1fr 1.15fr;gap:60px;align-items:start}
+.reg-form{border:1px solid var(--line);background:var(--paper);padding:44px}
+.f-row{margin-bottom:26px}
+.f-lbl{font-family:'Schibsted Grotesk',sans-serif;font-size:10px;font-weight:500;letter-spacing:0.28em;text-transform:uppercase;color:var(--stone);display:block;margin-bottom:10px}
+.f-in{width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);padding:10px 2px;font-family:'Inter',sans-serif;font-size:15px;font-weight:300;color:var(--ink);outline:none;transition:border-color .2s;border-radius:0}
+.f-in:focus{border-bottom-color:var(--clay)}
+textarea.f-in{resize:vertical;min-height:84px;line-height:1.6}
+.f-opts{display:flex;flex-wrap:wrap;gap:10px}
+.f-opt{position:relative}
+.f-opt input{position:absolute;opacity:0;pointer-events:none}
+.f-opt span{display:inline-block;font-family:'Schibsted Grotesk',sans-serif;font-size:11px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;padding:11px 18px;border:1px solid var(--line);cursor:pointer;transition:all .2s;user-select:none}
+.f-opt input:checked+span{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.f-opt span:hover{border-color:var(--ink)}
+.f-btn{font-family:'Schibsted Grotesk',sans-serif;font-size:12px;font-weight:500;letter-spacing:0.22em;text-transform:uppercase;background:var(--clay);color:var(--paper);border:none;padding:17px 38px;cursor:pointer;transition:background .2s;width:100%}
+.f-btn:hover{background:#9c4f30}
+.f-btn:disabled{background:var(--stone);cursor:wait}
+.f-note{font-size:11px;color:var(--stone);line-height:1.6;margin-top:16px;letter-spacing:0.03em}
+.f-done{display:none;text-align:center;padding:40px 10px}
+.f-done .big{font-family:'Schibsted Grotesk',sans-serif;font-weight:800;font-size:2rem;letter-spacing:-0.01em;margin-bottom:14px}
+.f-done p{font-size:14px;color:#46443e;line-height:1.7}
+.f-err{display:none;font-size:12px;color:#8a3d1d;background:rgba(181,97,61,0.1);border-left:2px solid var(--clay);padding:12px 16px;margin-top:16px;line-height:1.5}
+.f-err a{color:var(--clay)}
+
+.reg-side h3{font-family:'Schibsted Grotesk',sans-serif;font-size:10px;font-weight:500;letter-spacing:0.3em;text-transform:uppercase;color:var(--clay);margin:34px 0 14px}
+.reg-side h3:first-child{margin-top:0}
+.reg-side ul{list-style:none;display:grid;gap:9px}
+.reg-side li{font-size:13px;color:#46443e;padding-left:14px;position:relative;line-height:1.55}
+.reg-side li::before{content:'';position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--stone)}
+
+footer{padding:46px 48px;border-top:1px solid var(--line);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--stone);text-align:center}
+footer a{color:var(--clay);text-decoration:none}
+
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .8s ease,transform .8s ease}
+.reveal.in{opacity:1;transform:none}
+
+@media(max-width:900px){.reg-grid{grid-template-columns:1fr}}
+@media(max-width:820px){
+  nav{padding:16px 20px}.nav-links{gap:16px}
+  .hero-body{padding:0 22px 40px}
+  .sec{padding:60px 22px}
+  .reg-form{padding:28px 22px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-mark">South End</a>
+  <ul class="nav-links">
+    <li><a href="alps-run.html">The Run</a></li>
+    <li><a href="alps-ride.html">The Ride</a></li>
+    <li><a href="alps-calendar.html">Calendar</a></li>
+    <li><a href="alps-register.html">Register</a></li>
+  </ul>
+</nav>
+
+<section class="hero">
+  <div class="hero-motion"></div>
+  <div class="hero-body">
+    <span class="hb-eyebrow">Run.Ride the Alps · 2027</span>
+    <h1 class="hb-title">Next<br>year.</h1>
+    <p class="hb-sub">The 2026 edition is done. The mountains aren't going anywhere — put your name down for July 2027 and we'll build the next one together.</p>
+  </div>
+</section>
+
+<section class="sec reveal">
+  <div class="reg-grid">
+    <div class="reg-side">
+      <span class="sec-tag">The idea</span>
+      <h2 class="sec-h">Same mountains, new crew.</h2>
+      <p class="route-prose" style="font-size:1.05rem">Registering isn't a commitment — it's a hand up. Once we know who's in, we'll lock dates, route and huts, and you'll be first to hear.</p>
+      <h3>What you're signing up for</h3>
+      <ul>
+        <li>Hut-to-hut trail running through the Dolomites — big days, long views</li>
+        <li>Riding the storied cols — think Alpe d'Huez territory</li>
+        <li>Roughly ten days, mid-July 2027 — exact dates set with the crew</li>
+      </ul>
+      <h3>What happens next</h3>
+      <ul>
+        <li>We tally interest after the summer</li>
+        <li>Dates and route drop by early 2027</li>
+        <li>Registered names get first call on spots</li>
+      </ul>
+    </div>
+    <div class="reg-form">
+      <form id="regform" novalidate>
+        <div class="f-row">
+          <label class="f-lbl" for="f-name">Name</label>
+          <input class="f-in" id="f-name" name="name" type="text" autocomplete="name" required>
+        </div>
+        <div class="f-row">
+          <label class="f-lbl" for="f-email">Email</label>
+          <input class="f-in" id="f-email" name="email" type="email" autocomplete="email" required>
+        </div>
+        <div class="f-row">
+          <span class="f-lbl">I'm in for</span>
+          <div class="f-opts">
+            <label class="f-opt"><input type="radio" name="joining_for" value="The Run" required><span>The Run</span></label>
+            <label class="f-opt"><input type="radio" name="joining_for" value="The Ride"><span>The Ride</span></label>
+            <label class="f-opt"><input type="radio" name="joining_for" value="Both" checked><span>Both</span></label>
+          </div>
+        </div>
+        <div class="f-row">
+          <label class="f-lbl" for="f-notes">Anything else <span style="text-transform:none;letter-spacing:0.05em">(optional)</span></label>
+          <textarea class="f-in" id="f-notes" name="notes" placeholder="Dates that work, fitness worries, dietary stuff, mates you're bringing…"></textarea>
+        </div>
+        <input type="text" name="_honey" style="display:none" tabindex="-1" autocomplete="off">
+        <button class="f-btn" type="submit" id="f-submit">Put my name down</button>
+        <p class="f-note">No spam, no commitment — just first dibs when 2027 takes shape.</p>
+        <div class="f-err" id="f-err">Something glitched sending that. Try again, or just email <a href="mailto:gusharman@gmail.com?subject=Run.Ride%20the%20Alps%202027">gusharman@gmail.com</a> with your name and run/ride/both.</div>
+      </form>
+      <div class="f-done" id="f-done">
+        <div class="big">You're on the list.</div>
+        <p>We'll be in touch when dates and route for 2027 lock in. Registered names hear first.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>South End · Run.Ride the Alps · July 2027 · <a href="https://instagram.com/thesouthend.co" target="_blank" rel="noopener">@thesouthend.co</a></footer>
+
+<script>
+const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target)}}),{threshold:0.06});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+const form=document.getElementById('regform');
+form.addEventListener('submit',async e=>{
+  e.preventDefault();
+  if(!form.reportValidity())return;
+  const btn=document.getElementById('f-submit');
+  const err=document.getElementById('f-err');
+  err.style.display='none';
+  btn.disabled=true;btn.textContent='Sending…';
+  const data=Object.fromEntries(new FormData(form).entries());
+  data._subject='Run.Ride the Alps 2027 — registration: '+data.name;
+  data._template='table';
+  try{
+    const r=await fetch('https://formsubmit.co/ajax/gusharman@gmail.com',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify(data)
+    });
+    if(!r.ok)throw new Error('bad status');
+    form.style.display='none';
+    document.getElementById('f-done').style.display='block';
+  }catch(_){
+    err.style.display='block';
+    btn.disabled=false;btn.textContent='Put my name down';
+  }
+});
+</script>
+</body>
+</html>
